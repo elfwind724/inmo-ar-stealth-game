@@ -97,5 +97,50 @@
       mat.color?.convertSRGBToLinear();mat.emissive?.convertSRGBToLinear();materials.add(mat);
     }});
   }
-  root.INMOAssets={products,createGlasses,createStudioEnvironment,linearizeScene};
+  let contactMap;
+  function contactShadow(T,width,depth,opacity=.55) {
+    if(!contactMap){
+      const canvas=document.createElement('canvas');canvas.width=128;canvas.height=128;
+      const ctx=canvas.getContext('2d'),gradient=ctx.createRadialGradient(64,64,10,64,64,64);
+      gradient.addColorStop(0,'rgba(0,0,0,.86)');gradient.addColorStop(.48,'rgba(0,0,0,.66)');gradient.addColorStop(.8,'rgba(0,0,0,.2)');gradient.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=gradient;ctx.fillRect(0,0,128,128);contactMap=new T.CanvasTexture(canvas);
+    }
+    const shadow=new T.Mesh(new T.PlaneGeometry(width,depth),new T.MeshBasicMaterial({map:contactMap,transparent:true,opacity,depthWrite:false,toneMapped:false}));
+    shadow.rotation.x=-Math.PI/2;return shadow;
+  }
+  function createCar(T){
+    const car=new T.Group();
+    const paint=new T.MeshPhysicalMaterial({color:0x243b4c,roughness:.22,metalness:.65,clearcoat:1,clearcoatRoughness:.12,envMapIntensity:1.2});
+    const glass=new T.MeshPhysicalMaterial({color:0x34566c,roughness:.065,metalness:.45,envMapIntensity:1.6,side:T.DoubleSide});
+    const trim=new T.MeshStandardMaterial({color:0x8999a3,roughness:.3,metalness:.9});
+    const dark=new T.MeshStandardMaterial({color:0x101820,roughness:.8});
+    const add=(geo,mat,x=0,y=0,z=0)=>{const mesh=new T.Mesh(geo,mat);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;car.add(mesh);return mesh;};
+    const body=add(new T.ExtrudeGeometry(roundedPath(T,4.6,.75,.22),{depth:1.95,bevelEnabled:true,bevelSize:.07,bevelThickness:.07,bevelSegments:3,curveSegments:6}),paint,0,.66,-.975);
+    const roof=new T.Shape();roof.moveTo(-1.55,.95);roof.lineTo(-.96,1.62);roof.quadraticCurveTo(-.88,1.71,-.66,1.71);roof.lineTo(.52,1.71);roof.quadraticCurveTo(.68,1.71,.80,1.54);roof.lineTo(1.38,.95);roof.closePath();
+    add(new T.ExtrudeGeometry(roof,{depth:1.65,bevelEnabled:true,bevelSize:.025,bevelThickness:.025,bevelSegments:2}),paint,0,0,-.825);
+    const quad=points=>{const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(points.flat(),3));geo.setIndex([0,1,2,0,2,3]);geo.computeVertexNormals();return add(geo,glass);};
+    quad([[.81,1.57,-.76],[1.33,1.02,-.79],[1.33,1.02,.79],[.81,1.57,.76]]);
+    quad([[-1.50,1.02,-.79],[-.97,1.58,-.76],[-.97,1.58,.76],[-1.50,1.02,.79]]);
+    for(const side of [-1,1]){
+      const z=side*.858;
+      quad([[-1.35,1.06,z],[-.92,1.59,z],[-.22,1.59,z],[-.22,1.06,z]]);
+      quad([[-.14,1.06,z],[-.14,1.59,z],[.55,1.59,z],[1.18,1.06,z]]);
+      add(new T.BoxGeometry(2.55,.025,.025),trim,-.06,1.02,side*.87);
+      add(new T.BoxGeometry(.21,.035,.04),trim,-.43,.90,side*1.01);
+      add(new T.BoxGeometry(.21,.035,.04),trim,.75,.90,side*1.01);
+      add(new T.BoxGeometry(.28,.14,.21),paint,.80,1.13,side*1.02);
+      for(const x of [-1.47,1.47]){
+        const tyre=add(new T.CylinderGeometry(.39,.39,.23,24),dark,x,.40,side*.98);tyre.rotation.x=Math.PI/2;
+        const rim=add(new T.CylinderGeometry(.24,.24,.244,16),trim,x,.40,side*.99);rim.rotation.x=Math.PI/2;
+        const hub=add(new T.CylinderGeometry(.10,.10,.255,12),dark,x,.40,side*1.00);hub.rotation.x=Math.PI/2;
+      }
+      add(new T.BoxGeometry(.055,.14,.47),new T.MeshBasicMaterial({color:0xffe8ba,toneMapped:false}),2.30,.72,side*.64);
+      add(new T.BoxGeometry(.055,.12,.47),new T.MeshBasicMaterial({color:0xf05e4d,toneMapped:false}),-2.30,.72,side*.64);
+    }
+    add(new T.BoxGeometry(.06,.16,.88),dark,2.32,.49,0);
+    add(new T.BoxGeometry(.07,.12,.45),new T.MeshStandardMaterial({color:0xaab8be,metalness:.3,roughness:.6}),-2.32,.48,0);
+    const shadow=contactShadow(T,5.6,3.3,.75);shadow.position.y=.015;car.add(shadow);
+    return car;
+  }
+  root.INMOAssets={products,createGlasses,createStudioEnvironment,linearizeScene,contactShadow,createCar};
 })(typeof window !== 'undefined' ? window : globalThis);

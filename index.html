@@ -1072,6 +1072,7 @@
       monStand.position.set(0.3, 1.45, 0);
       recGroup.add(monStand);
       envGroup.add(recGroup);
+      const receptionShadow=INMOAssets.contactShadow(THREE,8.9,3.2,.58);receptionShadow.position.set(-.2,.026,-7.6);envGroup.add(receptionShadow);
       const backLight = new THREE.Mesh(new THREE.BoxGeometry(26.8,.055,.08),new THREE.MeshBasicMaterial({color:0x9edcf0,toneMapped:false}));
       backLight.position.set(0,6.72,-9.62);envGroup.add(backLight);
       for(const x of [-13.65,13.65]){
@@ -1230,7 +1231,7 @@
       treeGroup.add(trunk);
       const canopy = new THREE.Mesh(
         new THREE.IcosahedronGeometry(2.65, 1),
-        new THREE.MeshStandardMaterial({ color: 0x4d7c2b, flatShading: true, roughness: 0.8 })
+        new THREE.MeshStandardMaterial({ color: 0x315f41, flatShading: true, roughness: 0.8 })
       );
       canopy.position.y = 4.8;
       canopy.castShadow = true;
@@ -1290,18 +1291,9 @@
       addBoxCollider(-11.8, 8.2, 0.6, 0.6);
 
       // Parked Black Sedan Car on Bottom-Right Curb (Matches Image 1)
-      const carGroup = new THREE.Group();
+      const carGroup = INMOAssets.createCar(THREE);
       carGroup.position.set(3.2, 0, 14.3);
       carGroup.rotation.y = -0.18;
-      const carBodyMat = new THREE.MeshStandardMaterial({ color: 0x14181f, roughness: 0.2, metalness: 0.7 });
-      const lowerCar = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.85, 2.1), carBodyMat);
-      lowerCar.position.y = 0.6;
-      lowerCar.castShadow = true;
-      carGroup.add(lowerCar);
-      const cabinCar = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.72, 1.8), carBodyMat);
-      cabinCar.position.set(-0.2, 1.32, 0);
-      cabinCar.castShadow = true;
-      carGroup.add(cabinCar);
       envGroup.add(carGroup);
       addBoxCollider(3.2, 14.3, 4.8, 2.3);
 
@@ -1353,6 +1345,7 @@
         baseMesh.castShadow = true;
         baseMesh.receiveShadow = true;
         cg.add(baseMesh);
+        const contactShadow=INMOAssets.contactShadow(THREE,4.8,3.35,.66);contactShadow.position.y=.027;cg.add(contactShadow);
         const rim = new THREE.Mesh(new THREE.BoxGeometry(3.24,.035,1.79),new THREE.MeshStandardMaterial({color:0xb0966d,metalness:.65,roughness:.3}));
         rim.position.y=1.28;cg.add(rim);
         const foot = new THREE.Mesh(new THREE.BoxGeometry(3.0,.15,1.57),new THREE.MeshStandardMaterial({color:0x101d27,roughness:.55}));
@@ -1374,6 +1367,7 @@
         pad.position.set(-0.32, 1.35, 0);
         pad.receiveShadow=true;
         cg.add(pad);
+        const productShadow=INMOAssets.contactShadow(THREE,2.15,1.5,.38);productShadow.position.set(-.32,1.408,0);cg.add(productShadow);
 
         // 3D AR Glasses Model sitting on the Riser Pad
         const glasses3D = create3DGlassesMesh(item.code);
@@ -1549,6 +1543,10 @@
       CAMERA_CONFIGS.forEach((cfg) => {
         const root = new THREE.Group();
         scene.add(root);
+        if(cfg.mountPos.z>0){
+          const post=new THREE.Mesh(new THREE.CylinderGeometry(.065,.085,cfg.mountPos.y,10),new THREE.MeshStandardMaterial({color:0x304755,roughness:.45,metalness:.55}));
+          post.position.set(cfg.mountPos.x,cfg.mountPos.y/2,cfg.mountPos.z);post.castShadow=true;root.add(post);
+        }
 
         // Wall Bracket
         const bracket = new THREE.Mesh(
@@ -1916,6 +1914,9 @@
     buildSecurityCameras();
     buildClerk();
     buildPlayer();
+    for(const character of [player.group,clerk.group]){
+      const shadow=INMOAssets.contactShadow(THREE,1.5,1.25,.58);shadow.position.y=.033;character.add(shadow);
+    }
     INMOAssets.linearizeScene(scene);
 
     // =========================================================================
@@ -2825,7 +2826,7 @@
               document.getElementById('tt-counter-num').textContent = `#${item.counterNum}号柜台`;
               document.getElementById('tt-price').textContent = item.displayPrice;
               document.getElementById('tt-spec').textContent = item.spec;
-              document.getElementById('tt-svg-holder').innerHTML = `<img class="product-photo" data-model="${item.code}" src="${INMOAssets.products[item.code].image}" alt="${item.name} 官方展示图">`;
+              document.getElementById('tt-svg-holder').innerHTML = `<img class="product-photo" data-model="${item.code}" src="${INMOAssets.products[item.code].image}" alt="${item.name} 产品展示图">`;
             }
           }
         } else {
@@ -2987,7 +2988,7 @@
         card.className = 'p-3 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-sky-400/70 transition cursor-pointer flex items-center gap-3';
         card.innerHTML = `
           <div class="w-24 h-16 bg-slate-950 rounded border border-slate-800 flex items-center justify-center flex-shrink-0 p-1">
-            <img class="product-photo" data-model="${item.code}" src="${INMOAssets.products[item.code].image}" alt="${item.name} 官方展示图" loading="lazy">
+            <img class="product-photo" data-model="${item.code}" src="${INMOAssets.products[item.code].image}" alt="${item.name} 产品展示图" loading="lazy">
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between">
