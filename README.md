@@ -6,7 +6,7 @@ Three.js 45° 俯视潜行小游戏。玩家从街道进入半剖面的 INMO 展
 
 ## 场景与眼镜素材
 
-展厅使用深色石材、金属展柜、分柜聚光、环境反射和柔和投影。六副眼镜拥有独立镜框轮廓、镜片、镜腿、鼻托和传感器细节；场景模型为游戏展示而制作，并非原厂 CAD 模型。走近柜台可查看对应的官方展示图，图鉴中也保留了产品图。
+展厅使用深色石材、金属展柜、分柜聚光、环境反射和柔和投影。六副眼镜拥有独立镜框轮廓、镜片、镜腿、鼻托和传感器细节；场景模型为游戏展示而制作，并非原厂 CAD 模型。走近柜台可查看对应的产品展示图，图鉴中也保留了产品图。
 
 产品图片来自 [INMO Air 发布报道](https://www.leiphone.com/category/industrynews/0d1ucsnmAHQrTqtO.html)、[官方支持中心](https://support.inmoxr.com/) 与 [GO3 官方产品页](https://www.inmo.com/products/inmo-go3)，原图地址记录于 `assets/products/sources.json`。图片与品牌权利属于各自权利人。
 
