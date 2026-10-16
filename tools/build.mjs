@@ -18,19 +18,21 @@ html = html.replace('<script src="https://cdn.tailwindcss.com/3.4.17"></script>'
   .replace('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', './vendor/three.min.js')
   .replace(/^\s*<link[^>]+(?:fonts\.googleapis|fonts\.gstatic)[^>]*>\s*$/gm, '');
 await fs.writeFile(path.join(dist, 'index.html'), html);
-for (const file of ['game-rules.js', 'ui-polish.css', 'showroom-assets.js']) await fs.copyFile(path.join(root, file), path.join(dist, file));
+for (const file of ['game-rules.js', 'ui-polish.css', 'showroom-assets.js', 'police-chapter.js', 'police-chapter.css']) await fs.copyFile(path.join(root, file), path.join(dist, file));
 await fs.cp(path.join(root,'assets/products'),path.join(dist,'assets/products'),{recursive:true});
 await fs.copyFile(path.join(root, 'node_modules/three/build/three.min.js'), path.join(dist, 'vendor/three.min.js'));
 await fs.copyFile(path.join(root, 'node_modules/three/LICENSE'), path.join(dist, 'vendor/THREE-LICENSE.txt'));
 const release = path.join(root, 'release');
 await fs.mkdir(release, { recursive: true });
-const [uiCss, polishCss, rulesJs, threeJs, threeLicense, showroomJs] = await Promise.all([
+const [uiCss, polishCss, rulesJs, threeJs, threeLicense, showroomJs, chapterJs, chapterCss] = await Promise.all([
   fs.readFile(path.join(dist, 'assets/ui.css'), 'utf8'),
   fs.readFile(path.join(dist, 'ui-polish.css'), 'utf8'),
   fs.readFile(path.join(dist, 'game-rules.js'), 'utf8'),
   fs.readFile(path.join(dist, 'vendor/three.min.js'), 'utf8'),
   fs.readFile(path.join(dist, 'vendor/THREE-LICENSE.txt'), 'utf8'),
-  fs.readFile(path.join(dist, 'showroom-assets.js'), 'utf8')
+  fs.readFile(path.join(dist, 'showroom-assets.js'), 'utf8'),
+  fs.readFile(path.join(dist, 'police-chapter.js'), 'utf8'),
+  fs.readFile(path.join(dist, 'police-chapter.css'), 'utf8')
 ]);
 const inlineScript = text => '<script>\n' + text.replace(/<\/script/gi, '<\\/script') + '\n</script>';
 let standalone = html
@@ -38,6 +40,8 @@ let standalone = html
   .replace('<link rel="stylesheet" href="./ui-polish.css">', () => '<style>' + polishCss + '</style>')
   .replace('<script src="./game-rules.js"></script>', () => inlineScript(rulesJs))
   .replace('<script src="./showroom-assets.js"></script>', () => inlineScript(showroomJs))
+  .replace('<script src="./police-chapter.js"></script>', () => inlineScript(chapterJs))
+  .replace('<link rel="stylesheet" href="./police-chapter.css">', () => '<style>' + chapterCss + '</style>')
   .replace('<script src="./vendor/three.min.js"></script>', () => '<!-- ' + threeLicense + ' -->\n' + inlineScript(threeJs));
 for(const code of ['air1','air2','air3','go1','go2','go3']){
   const data=await fs.readFile(path.join(root,'assets/products',code+'.png'));

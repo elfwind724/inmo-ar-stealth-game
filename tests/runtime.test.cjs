@@ -29,6 +29,7 @@ async function runtime() {
   const evaluate=code=>vm.runInContext(code,context);
   evaluate(fs.readFileSync(path.join(__dirname,'../game-rules.js'),'utf8'));
   evaluate(fs.readFileSync(path.join(__dirname,'../showroom-assets.js'),'utf8'));
+  evaluate(fs.readFileSync(path.join(__dirname,'../police-chapter.js'),'utf8'));
   for(const m of source.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) if(m[1].trim()) evaluate(m[1]);
   evaluate('SoundFX.enabled=false');
   win.onload();

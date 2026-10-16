@@ -217,6 +217,8 @@
   <link rel="stylesheet" href="./ui-polish.css">
   <script src="./game-rules.js"></script>
   <script src="./showroom-assets.js"></script>
+  <link rel="stylesheet" href="./police-chapter.css">
+  <script src="./police-chapter.js"></script>
 </head>
 <body>
   <!-- 3D WebGL Viewport -->
@@ -398,12 +400,42 @@
 
       <div class="flex items-center gap-3">
         <button id="btn-play-again" class="hud-btn flex-1 py-2.5 text-sm mono-font font-bold bg-sky-600/30 border-sky-400 text-white">
-          🔄 再来一局 (Play Again)
+          重来
         </button>
+        <button id="btn-continue-story" class="hud-btn flex-1 py-2.5 text-sm mono-font font-bold hidden">继续 →</button>
         <button id="btn-end-leaderboard" class="hud-btn px-4 py-2.5 text-sm mono-font">
           📊 排行榜
         </button>
       </div>
+    </div>
+  </div>
+
+  <section id="chapter-hud" hidden aria-label="警局突围">
+    <div class="chapter-heading"><div id="chapter-kicker">第二章</div><h2 id="chapter-caption"></h2><p id="chapter-hint"></p></div>
+    <button id="chapter-pause-button" class="hud-btn" aria-label="暂停警局章节">暂停 / 帮助</button>
+    <div id="chapter-combat-ui" hidden>
+      <div class="chapter-health-head"><span>体力</span><strong id="chapter-health-value">120 / 120</strong></div>
+      <div class="chapter-meter" role="img" aria-label="玩家体力"><div id="chapter-health-fill"></div></div>
+      <div class="chapter-progress"><span>警卫 <strong id="chapter-enemy-count">0 / 7</strong></span><span id="chapter-key">牢门已锁</span></div>
+      <div id="chapter-boss-status">Boss 待登场</div>
+    </div>
+    <div id="chapter-target" hidden><strong id="chapter-target-name"></strong><div class="chapter-meter"><div id="chapter-target-fill"></div></div></div>
+    <button id="chapter-cell-action" class="chapter-action" hidden>打晕警察 · 拿钥匙</button>
+    <button id="chapter-dodge" class="chapter-action" hidden>闪避 · 空格</button>
+  </section>
+  <div id="chapter-speech" hidden>吃饭吧，垃圾小偷</div>
+  <div id="chapter-transition" hidden><div id="chapter-transition-title"></div><div id="chapter-transition-subtitle"></div></div>
+  <div id="chapter-pause" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chapter-pause-title" hidden>
+    <div class="chapter-dialog-card"><div class="chapter-dialog-kicker">CHAPTER 02 / PAUSED</div><h2 id="chapter-pause-title">故事暂停在这里</h2>
+      <p>点击敌人，角色会自动追近，交替出拳和踢腿。点击地面或用 WASD 走位；看到红色、橙色攻击范围时，按空格或 Shift 闪避。击倒警卫会恢复少量体力。</p>
+      <p>先从送饭警察身上拿钥匙，再击倒 7 名警卫和典狱长。鼠标滚轮不会缩放。</p>
+      <div class="chapter-dialog-actions"><button id="chapter-resume" class="primary-action">继续</button><button id="chapter-restart" class="hud-btn">重回展厅</button></div>
+    </div>
+  </div>
+  <div id="chapter-result" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chapter-result-title" hidden>
+    <div class="chapter-dialog-card"><div id="chapter-result-kicker" class="chapter-dialog-kicker"></div><h2 id="chapter-result-title"></h2>
+      <p id="chapter-result-copy"></p><div id="chapter-result-stats"></div>
+      <div class="chapter-dialog-actions"><button id="chapter-retry" class="primary-action">重试警局</button><button id="chapter-result-restart" class="hud-btn">重回展厅</button></div>
     </div>
   </div>
 
@@ -1958,6 +1990,7 @@
       document.getElementById('pause-state').classList.toggle('hidden', !isPaused());
     }
     function manualPause(paused) {
+      if (chapter.active) { chapter.pause(paused); return; }
       if (gameState.status !== 'PLAYING') return;
       if (paused) modalReturnFocus = document.activeElement;
       setPaused('manual', paused);
@@ -1987,9 +2020,9 @@
     }
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Tab') {
-        const topDialog = ['modal-leaderboard','modal-endgame','modal-catalog','modal-pause'].map(id=>document.getElementById(id)).find(el=>!el.classList.contains('hidden'));
+        const topDialog = ['chapter-result','chapter-pause','modal-leaderboard','modal-endgame','modal-catalog','modal-pause'].map(id=>document.getElementById(id)).find(el=>!el.hidden&&!el.classList.contains('hidden'));
         if (topDialog) {
-          const focusable = [...topDialog.querySelectorAll('button:not([disabled]), a[href], input:not([disabled])')].filter(el=>!el.closest('.hidden'));
+          const focusable = [...topDialog.querySelectorAll('button:not([disabled]), a[href], input:not([disabled])')].filter(el=>!el.closest('.hidden,[hidden]'));
           const first=focusable[0], last=focusable[focusable.length-1];
           if (first && (e.shiftKey ? document.activeElement===first : document.activeElement===last) || first && !topDialog.contains(document.activeElement)) {
             e.preventDefault(); (e.shiftKey ? last : first).focus();
@@ -2000,6 +2033,10 @@
       if (e.target.closest?.('input, textarea, [contenteditable="true"]')) return;
       const k = e.key.toLowerCase();
       if (['arrowup','arrowdown','arrowleft','arrowright',' ','e','p','escape'].includes(k)) e.preventDefault();
+      if (chapter.active) {
+        if (!chapter.paused) keys[k] = true;
+        SoundFX.init(); chapter.key(e); return;
+      }
       if (k === 'escape' || k === 'p') {
         if (e.repeat) return;
         const modal = ['modal-catalog','modal-leaderboard'].find(id => !document.getElementById(id).classList.contains('hidden'));
@@ -2218,6 +2255,9 @@
       saveBtn.textContent = isWin ? '更新代号' : '计入排行榜';
       saveBtn.disabled = false;
       document.getElementById('endgame-save-box').classList.toggle('hidden', !isWin);
+      document.getElementById('btn-continue-story').classList.toggle('hidden', isWin);
+      document.getElementById('btn-end-leaderboard').classList.toggle('hidden', !isWin);
+      document.getElementById('btn-play-again').textContent = isWin ? '再来一局' : '重来';
       if (isWin) saveCurrentRun(false);
 
       modal.classList.remove('hidden');
@@ -2226,7 +2266,9 @@
     }
 
     function restartGame() {
+      chapter.stop();
       gameState.status = 'PLAYING'; pauseReasons.clear(); clearInput();
+      camYawOffset=0; cameraTarget.set(0,.5,1.5);
       player.path = []; clerk.route = []; gameState.nearestCounter = null;
       gameState.scoreSavedThisRun = false; gameState.runId = Date.now().toString(36) + Math.random().toString(36).slice(2,7);
       gameState.resultBonus = 0; currentTooltipCounterId = null;
@@ -2283,10 +2325,22 @@
     const mouseNDC = new THREE.Vector2();
     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
+    const chapter = PoliceChapter.create({ THREE, scene, camera, player, keys, sound:SoundFX,
+      toast:showToast, assets:INMOAssets, rules:GameRules, clearInput, restart:restartGame,
+      showroomPath:(start,end)=>routePlanner.findPath(start,end) });
+    document.getElementById('btn-continue-story').addEventListener('click',()=>{
+      if (gameState.status !== 'GAMEOVER') return;
+      clearInput(); pauseReasons.clear(); cancelSteal();
+      document.getElementById('modal-endgame').classList.add('hidden');
+      document.getElementById('modal-endgame').classList.remove('flex');
+      chapter.start();
+    });
+
     let isDraggingCamera = false;
     let dragStartX = 0;
 
     renderer.domElement.addEventListener('pointerdown', (e) => {
+      if (chapter.active) { SoundFX.init(); chapter.pointer(e,renderer.domElement); return; }
       if (gameState.status !== 'PLAYING' || isPaused()) return;
       SoundFX.init();
       if (e.button === 2 || e.button === 1) {
@@ -2530,6 +2584,10 @@
       requestAnimationFrame(animate);
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
+
+      if (chapter.active) {
+        chapter.update(dt); chapter.updateCamera(dt); renderer.render(scene,camera); return;
+      }
 
       if (gameState.status === 'PLAYING' && !isPaused()) {
         gameState.elapsedTime += dt;
@@ -2918,7 +2976,7 @@
     
     function bindDpad(btnId,keyName) {
       const el=document.getElementById(btnId);
-      el.addEventListener('pointerdown',e=>{e.preventDefault(); if(isPaused()||gameState.status!=='PLAYING') return; SoundFX.init();el.setPointerCapture(e.pointerId);keys[keyName]=true;});
+      el.addEventListener('pointerdown',e=>{e.preventDefault(); if(chapter.active?chapter.paused:(isPaused()||gameState.status!=='PLAYING')) return; SoundFX.init();el.setPointerCapture(e.pointerId);keys[keyName]=true;});
       for(const event of ['pointerup','pointercancel','lostpointercapture']) el.addEventListener(event,e=>{e.preventDefault();keys[keyName]=false;});
     }
     bindDpad('dpad-up','w');bindDpad('dpad-down','s');bindDpad('dpad-left','a');bindDpad('dpad-right','d');

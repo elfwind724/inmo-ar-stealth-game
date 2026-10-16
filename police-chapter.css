@@ -1,0 +1,54 @@
+[hidden] { display: none !important; }
+body.chapter-cinematic #touch-dpad { display: none !important; }
+body.police-chapter-active #mission-panel,
+body.police-chapter-active #top-right-hud,
+body.police-chapter-active #minimap-panel,
+body.police-chapter-active #stealth-panel,
+body.police-chapter-active #counter-tooltip,
+body.police-chapter-active #clerk-bubble,
+body.police-chapter-active #btn-quick-steal { display: none !important; }
+#chapter-hud { position: fixed; inset: 0; z-index: 24; pointer-events: none; color: #e5f0ee; font-family: 'Microsoft YaHei',sans-serif; }
+.chapter-heading { position: absolute; left: 20px; top: 20px; max-width: 340px; padding: 13px 17px; border-left: 2px solid #e8bc70; background: linear-gradient(90deg,rgba(10,24,34,.92),rgba(10,24,34,.62)); border-radius: 0 9px 9px 0; }
+#chapter-kicker { color: #dbb676; font: 700 10px/1.4 monospace; letter-spacing: .12em; }
+#chapter-caption { margin: 7px 0 0; font-size: 16px; font-weight: 700; line-height: 1.5; }
+#chapter-hint { margin: 7px 0 0; color: #a8c1ca; font-size: 11px; line-height: 1.6; }
+#chapter-pause-button { position: absolute; top: 20px; right: 20px; pointer-events: auto; }
+#chapter-combat-ui { position: absolute; bottom: 22px; left: 22px; width: 232px; padding: 12px 14px; background: rgba(10,25,36,.94); border: 1px solid #3b5865; border-radius: 9px; box-shadow: 0 8px 30px #07101c44; }
+.chapter-health-head,.chapter-progress { display: flex; justify-content: space-between; align-items:center; gap: 8px; font-size: 11px; }
+.chapter-health-head { color: #aac3cd; margin-bottom: 7px; }
+.chapter-health-head strong { color: #e4eee8; font: 700 13px monospace; }
+.chapter-meter { height: 6px; border-radius: 4px; overflow: hidden; background: #273d48; }
+#chapter-health-fill { height: 100%; width: 100%; background: linear-gradient(90deg,#398786,#87d9b5); transition: width .16s; }
+.chapter-progress { color: #9ab5c1; margin-top: 11px; }
+#chapter-enemy-count { color:#e8c386; }
+#chapter-boss-status { margin-top: 6px; color:#d2a473; font-size:10px; }
+#chapter-key { color:#c5d7d6; }
+#chapter-target { position:absolute; top:20px; left:50%; transform:translateX(-50%); width:220px; padding:10px 14px; border:1px solid #c59d59; background:#0b1b2cdd; border-radius:7px; text-align:center; }
+#chapter-target-name { display:block; font-size:12px; color:#ebc584; margin-bottom:7px; }
+#chapter-target-fill { width:100%; height:100%; background:#ecbb70; transition:width .15s; }
+.chapter-action { pointer-events:auto; position:absolute; right:22px; bottom:26px; min-height:46px; min-width:135px; border:1px solid #c5a46a; color:#f9dfb4; background:#243a44f2; padding:12px 20px; border-radius:8px; font:700 13px 'Microsoft YaHei',sans-serif; cursor:pointer; box-shadow:0 6px 25px #0005; touch-action:manipulation; }
+.chapter-action:disabled { color:#79949f; border-color:#46606c; cursor:default; }
+#chapter-speech { position:fixed; z-index:25; transform:translate(-50%,-100%); max-width:250px; padding:11px 15px; background:#efdfb7; color:#283542; font:700 13px 'Microsoft YaHei',sans-serif; border-radius:8px; box-shadow:0 7px 26px #0005; pointer-events:none; white-space:nowrap; }
+#chapter-speech:after { content:''; position:absolute; bottom:-8px; left:50%; border:8px solid transparent; border-top-color:#efdfb7; border-bottom:0; }
+#chapter-transition { position:fixed; inset:0; z-index:70; background:#03070d; color:#e6d8bb; display:flex; align-items:center; justify-content:center; flex-direction:column; pointer-events:none; }
+#chapter-transition-title { font:700 22px 'Microsoft YaHei',sans-serif; letter-spacing:.18em; }
+#chapter-transition-subtitle { color:#8196a3; font:12px 'Microsoft YaHei',sans-serif; margin-top:16px; }
+.chapter-dialog { position:fixed; inset:0; z-index:65; display:flex; align-items:center; justify-content:center; background:#040d19cc; backdrop-filter:blur(8px); padding:20px; color:#e2eced; }
+.chapter-dialog-card { width:420px; max-width:100%; padding:30px; background:#122733; border:1px solid #647372; border-radius:14px; box-shadow:0 30px 80px #0007; }
+.chapter-dialog-card h2 { margin:10px 0 16px; font-size:24px; color:#edc88c; }
+.chapter-dialog-card p { color:#a4bec9; font-size:13px; line-height:1.9; margin:0 0 16px; }
+.chapter-dialog-kicker { color:#bfa16d; font:10px monospace; letter-spacing:.16em; }
+.chapter-dialog-actions { display:flex; gap:10px; margin-top:22px; }
+.chapter-dialog-actions button { flex:1; min-height:44px; }
+#chapter-result-stats { padding:12px; border:1px solid #3a5260; border-radius:6px; font:12px monospace; color:#cbd6cc; }
+#btn-continue-story { color:#f8d18d; border-color:#c79e55; background:#59432c88; }
+@media(max-width:700px) {
+  .chapter-heading { left:10px; top:10px; padding:10px 12px; max-width:240px; }
+  #chapter-caption { font-size:13px; } #chapter-hint { font-size:10px; }
+  #chapter-pause-button { top:10px; right:10px; font-size:11px; }
+  #chapter-combat-ui { width:186px; bottom:14px; left:12px; padding:10px 12px; }
+  body.police-chapter-active #touch-dpad { bottom:124px; left:12px; }
+  #chapter-target { top:126px; width:180px; padding:7px 10px; }
+  .chapter-action { bottom:18px; right:12px; min-width:112px; padding:11px 13px; }
+  .chapter-dialog-card { padding:24px; }.chapter-dialog-card h2{font-size:21px;}
+}
