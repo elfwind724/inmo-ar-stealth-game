@@ -23,6 +23,10 @@ body.police-chapter-active #btn-quick-steal { display: none !important; }
 .chapter-progress { color: #9ab5c1; margin-top: 11px; }
 #chapter-enemy-count { color:#e8c386; }
 #chapter-boss-status { margin-top: 6px; color:#d2a473; font-size:10px; }
+#chapter-squad { margin-top:5px; color:#8fbac6; font-size:10px; }
+#chapter-auto-attack { bottom:82px; color:#b9e7e9; border-color:#538594; background:#15313cee; font-size:11px; }
+#chapter-combo { position:absolute; left:50%; bottom:48px; transform:translateX(-50%); color:#ffdc99; padding:10px 18px; font-size:15px; font-weight:800; text-shadow:0 2px 6px #000; background:#091c2acc; border-radius:5px; }
+#chapter-impact { position:fixed; inset:0; pointer-events:none; z-index:23; opacity:0; box-shadow:inset 0 0 120px 28px #d13e2b; }
 #chapter-key { color:#c5d7d6; }
 #chapter-target { position:absolute; top:20px; left:50%; transform:translateX(-50%); width:220px; padding:10px 14px; border:1px solid #c59d59; background:#0b1b2cdd; border-radius:7px; text-align:center; }
 #chapter-target-name { display:block; font-size:12px; color:#ebc584; margin-bottom:7px; }
@@ -51,5 +55,7 @@ body.police-chapter-active #btn-quick-steal { display: none !important; }
   body.police-chapter-active #touch-dpad { bottom:124px; left:12px; }
   #chapter-target { top:126px; width:180px; padding:7px 10px; }
   .chapter-action { bottom:18px; right:12px; min-width:112px; padding:11px 13px; }
+  #chapter-auto-attack { bottom:72px; }
+  #chapter-combo { bottom:126px; font-size:12px; }
   .chapter-dialog-card { padding:24px; }.chapter-dialog-card h2{font-size:21px;}
 }

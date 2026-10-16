@@ -1,0 +1,30 @@
+body.highway-active #chapter-hud,body.highway-active #chapter-speech,
+body.highway-active #chapter-impact,body.highway-active #touch-dpad { display:none!important; }
+#chase-hud { position:fixed; inset:0; z-index:26; pointer-events:none; color:#e9e7db; font-family:'Microsoft YaHei',sans-serif; }
+.chase-objective { position:absolute; left:24px; top:22px; width:250px; padding:13px 16px; background:linear-gradient(90deg,#0c1b2df2,#0c1b2d88); border-left:2px solid #e0b976; border-radius:0 8px 8px 0; }
+.chase-objective>span { color:#cbb789; font:10px monospace; letter-spacing:.14em; }.chase-objective h2 { font-size:17px; margin:6px 0; }.chase-objective p { color:#9db7c7; font-size:11px; margin:0 0 11px; }
+.chase-progress-track { background:#2b3f50; height:3px; width:100%; }.chase-progress-track>div{height:100%;background:#dcb873;width:0;}
+.chase-clock { position:absolute; top:22px; right:24px; display:flex; align-items:center; gap:12px; padding:10px 13px; background:#0b1c2ddb; border:1px solid #526477; border-radius:8px; }
+.chase-clock small{font-size:10px;color:#9eb4c4;}.chase-clock strong{font:700 24px monospace;color:#f2d69e;}.chase-clock button{pointer-events:auto;font-size:10px;}
+.chase-speedometer { position:absolute; left:28px; bottom:46px; min-width:220px; text-shadow:0 3px 15px #07121a; }.chase-speedometer strong{font:800 72px/.9 monospace;letter-spacing:-.08em;}.chase-speedometer>span{font:11px monospace;margin-left:13px;color:#9dbacb;}.chase-speedometer p{font:11px 'Microsoft YaHei',sans-serif;color:#95d6c5;margin:12px 0 0;}
+#chase-warning{position:absolute;top:112px;left:50%;transform:translateX(-50%);padding:10px 16px;background:#3e2a20ee;border:1px solid #c59156;border-radius:6px;color:#f5cd92;font-size:12px;}
+#chase-stop-warning{position:absolute;top:158px;left:50%;transform:translateX(-50%);padding:9px 15px;border:1px solid #e47c6d;background:#4e2025e6;color:#ffd8cf;font-size:12px;}
+.chase-actions{position:absolute;right:24px;bottom:46px;display:flex;gap:10px;pointer-events:auto;}.chase-actions button{min-height:46px;font-size:12px;}.chase-actions button:disabled{color:#8b9da2;background:#243744;border-color:#506571;}
+.chase-driving-controls{display:none;position:absolute;bottom:122px;left:24px;gap:7px;pointer-events:auto;}.chase-driving-controls button{min-width:53px;min-height:50px;padding:10px;color:#c7e3e8;border:1px solid #587889;background:#102b3bcf;border-radius:9px;touch-action:none;font-size:14px;}
+.chase-control-hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);font-size:10px;color:#97b1c2;white-space:nowrap;text-shadow:0 2px 4px #000;}
+#chase-roof{position:fixed;z-index:25;pointer-events:none;transform:translate(-50%,-100%);width:132px;padding:7px 9px;background:#0b2232d9;border:1px solid #55877f;border-radius:6px;color:#c0e5d6;font:10px 'Microsoft YaHei',sans-serif;box-shadow:0 4px 15px #05121f77;}
+.chase-roof-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:5px;}.chase-roof-head strong{color:#e0f9e8;font-family:monospace;}.chase-roof-track{height:5px;border-radius:2px;overflow:hidden;background:#2b4552;}#chase-durability-fill{height:100%;width:100%;background:#79c6a7;transition:width .15s;}#chase-roof.damaged{border-color:#c97e6e;}#chase-roof.damaged #chase-durability-fill{background:#e9886a;}
+#chase-speed-lines,#chase-damage-flash{position:absolute;inset:0;pointer-events:none;opacity:0;}
+#chase-speed-lines{background:repeating-conic-gradient(from 12deg at 50% 48%,transparent 0deg 15deg,#aed7e8 15.05deg 15.14deg,transparent 15.18deg 29deg);mask-image:radial-gradient(ellipse,transparent 33%,#000 105%);}
+#chase-damage-flash{box-shadow:inset 0 0 150px 30px #d1462c;}
+#chase-loading{position:absolute;inset:0;background:#07121f;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#e4c491;font-size:20px;letter-spacing:.08em;}#chase-loading span{margin-top:20px;font-size:12px;color:#8ea9b8;letter-spacing:0;}
+#chase-result-stats{font:12px/1.9 monospace;padding:12px;border:1px solid #3b5265;background:#0d2131;border-radius:6px;color:#c3d6d8;}
+@media(pointer:coarse){.chase-driving-controls{display:flex;}}
+@media(max-width:700px){
+ .chase-objective{left:10px;top:10px;width:181px;padding:9px 11px;}.chase-objective h2{font-size:14px;}.chase-objective>span{font-size:8px;}.chase-objective p{font-size:10px;}
+ .chase-clock{top:10px;right:10px;padding:7px 9px;gap:7px;flex-wrap:wrap;max-width:135px;}.chase-clock strong{font-size:21px;}.chase-clock small{font-size:9px;}.chase-clock button{padding:5px;}
+ .chase-speedometer{left:16px;bottom:34px;min-width:150px;}.chase-speedometer strong{font-size:52px;}.chase-speedometer p{font-size:9px;}.chase-actions{right:12px;bottom:39px;gap:6px;flex-direction:column;}.chase-actions button{min-height:38px;font-size:10px;padding:7px 11px;}
+ .chase-driving-controls{display:flex;bottom:124px;left:12px;}.chase-driving-controls button{min-width:45px;min-height:44px;font-size:12px;}.chase-control-hint{font-size:8px;bottom:12px;}
+ #chase-warning{top:116px;max-width:90%;font-size:10px;white-space:nowrap;}#chase-stop-warning{top:156px;white-space:nowrap;font-size:10px;}
+ #chase-roof{width:113px;font-size:9px;padding:6px 8px;}
+}

@@ -218,6 +218,9 @@
   <script src="./game-rules.js"></script>
   <script src="./showroom-assets.js"></script>
   <link rel="stylesheet" href="./police-chapter.css">
+  <link rel="stylesheet" href="./highway-chase.css">
+  <script src="./vendor/rapier.min.js" defer></script>
+  <script src="./highway-chase.js"></script>
   <script src="./police-chapter.js"></script>
 </head>
 <body>
@@ -418,25 +421,51 @@
       <div class="chapter-meter" role="img" aria-label="玩家体力"><div id="chapter-health-fill"></div></div>
       <div class="chapter-progress"><span>警卫 <strong id="chapter-enemy-count">0 / 7</strong></span><span id="chapter-key">牢门已锁</span></div>
       <div id="chapter-boss-status">Boss 待登场</div>
+      <div id="chapter-squad"></div>
     </div>
     <div id="chapter-target" hidden><strong id="chapter-target-name"></strong><div class="chapter-meter"><div id="chapter-target-fill"></div></div></div>
     <button id="chapter-cell-action" class="chapter-action" hidden>打晕警察 · 拿钥匙</button>
     <button id="chapter-dodge" class="chapter-action" hidden>闪避 · 空格</button>
+    <button id="chapter-auto-attack" class="chapter-action" hidden>迎战最近敌人 · F</button>
+    <div id="chapter-combo" hidden></div>
   </section>
+  <div id="chapter-impact"></div>
   <div id="chapter-speech" hidden>吃饭吧，垃圾小偷</div>
   <div id="chapter-transition" hidden><div id="chapter-transition-title"></div><div id="chapter-transition-subtitle"></div></div>
   <div id="chapter-pause" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chapter-pause-title" hidden>
     <div class="chapter-dialog-card"><div class="chapter-dialog-kicker">CHAPTER 02 / PAUSED</div><h2 id="chapter-pause-title">故事暂停在这里</h2>
-      <p>点击敌人，角色会自动追近，交替出拳和踢腿。点击地面或用 WASD 走位；看到红色、橙色攻击范围时，按空格或 Shift 闪避。击倒警卫会恢复少量体力。</p>
-      <p>先从送饭警察身上拿钥匙，再击倒 7 名警卫和典狱长。鼠标滚轮不会缩放。</p>
+      <p>点击敌人或按 F 迎战，自动追近并使用刺拳、直拳、摆拳、回旋踢；击倒后继续迎战附近敌人。点击地面可取消追击，WASD 可走位；空格或 Shift 闪避。被击中会硬直，无法继续出招。</p>
+      <p>出牢门后会有 2～3 名警卫围攻。警棍举起时准备闪避；Boss 还会冲刺、横扫，连续命中能破防。打赢后进入第三章警车追逐。鼠标滚轮不会缩放。</p>
       <div class="chapter-dialog-actions"><button id="chapter-resume" class="primary-action">继续</button><button id="chapter-restart" class="hud-btn">重回展厅</button></div>
     </div>
   </div>
   <div id="chapter-result" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chapter-result-title" hidden>
     <div class="chapter-dialog-card"><div id="chapter-result-kicker" class="chapter-dialog-kicker"></div><h2 id="chapter-result-title"></h2>
       <p id="chapter-result-copy"></p><div id="chapter-result-stats"></div>
-      <div class="chapter-dialog-actions"><button id="chapter-retry" class="primary-action">重试警局</button><button id="chapter-result-restart" class="hud-btn">重回展厅</button></div>
+      <div class="chapter-dialog-actions"><button id="chapter-retry" class="primary-action">重试警局</button><button id="chapter-next-chase" class="primary-action" hidden>开走警车 →</button><button id="chapter-result-restart" class="hud-btn">重回展厅</button></div>
     </div>
+  </div>
+
+  <section id="chase-hud" aria-label="第三章警车追逐" hidden>
+    <div class="chase-objective"><span>CHAPTER 03 / NIGHT RUN</span><h2>再借一辆警车</h2><p>坚持两分钟，甩掉追捕。</p><div class="chase-progress-track"><div id="chase-progress"></div></div></div>
+    <div class="chase-clock"><small>距离逃脱</small><strong id="chase-time">02:00</strong><button id="chase-pause-button" class="hud-btn">暂停 / 帮助</button></div>
+    <div class="chase-speedometer"><strong id="chase-speed">110</strong><span>km/h</span><p id="chase-clean">无碰撞 · 自动提速</p></div>
+    <div id="chase-warning" role="status" hidden></div><div id="chase-stop-warning" hidden>正在被逼停！转向摆脱夹击</div>
+    <div class="chase-driving-controls"><button id="chase-left" aria-label="车辆左转">◀</button><button id="chase-brake" aria-label="车辆刹车">刹车</button><button id="chase-right" aria-label="车辆右转">▶</button></div>
+    <div class="chase-actions"><button id="chase-rear-view" class="hud-btn">看后方 · C</button><button id="chase-brake-ram" class="primary-action">急刹反撞 · 空格</button></div>
+    <div class="chase-control-hint">A / D 转向 · S 刹车 · 空格急刹反撞 · 无碰撞自动提速</div>
+    <div id="chase-speed-lines"></div><div id="chase-damage-flash"></div>
+    <div id="chase-loading">第三章 · 警笛从身后响起<span>正在准备车辆场景…</span></div>
+  </section>
+  <div id="chase-roof" hidden><div class="chase-roof-head"><span>车辆耐久</span><strong id="chase-durability-value">100%</strong></div><div class="chase-roof-track"><div id="chase-durability-fill"></div></div></div>
+  <div id="chase-pause" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chase-pause-title" hidden>
+    <div class="chapter-dialog-card"><div class="chapter-dialog-kicker">CHAPTER 03 / PAUSED</div><h2 id="chase-pause-title">警笛先停一会儿</h2><p>坚持 120 秒即可逃脱。玩家最高 230 km/h，追击警车最高 190 km/h；无碰撞会自动加速，碰撞会掉耐久并减速。</p><p>A / D 或方向键左右转向，S 刹车，空格急刹反撞后方警车，C 切换后视。触屏可用底部按钮。耐久归零或被撞停连续 3 秒会失败，可直接重试追逐。</p><div class="chapter-dialog-actions"><button id="chase-resume" class="primary-action">继续驾驶</button><button id="chase-pause-return" class="hud-btn">重回展厅</button></div></div>
+  </div>
+  <div id="chase-result" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chase-result-title" hidden>
+    <div class="chapter-dialog-card"><div id="chase-result-kicker" class="chapter-dialog-kicker"></div><h2 id="chase-result-title"></h2><p id="chase-result-copy"></p><div id="chase-result-stats"></div><div class="chapter-dialog-actions"><button id="chase-retry" class="primary-action">再跑一次</button><button id="chase-return" class="hud-btn">重回展厅</button></div></div>
+  </div>
+  <div id="chase-entry" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chase-entry-title" hidden>
+    <div class="chapter-dialog-card"><div class="chapter-dialog-kicker">CHAPTER 03 / FREE DRIVE</div><h2 id="chase-entry-title">夜间追逐 · 独立试玩</h2><p>这辆警车暂时归你了。坚持两分钟，别让后面的警车把你撞停。无碰撞会自动提速，车顶显示耐久。</p><p>A / D 转向，S 刹车，空格急刹反撞，C 看后方。完整故事中，击败典狱长后会自动进入这一章。</p><div class="chapter-dialog-actions"><button id="chase-entry-start" class="primary-action">开始驾驶</button><button id="chase-entry-back" class="hud-btn">从展厅开始</button></div></div>
   </div>
 
   <div id="modal-pause" class="game-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
@@ -1991,6 +2020,7 @@
     }
     function manualPause(paused) {
       if (chapter.active) { chapter.pause(paused); return; }
+      if (!document.getElementById('chase-entry').hidden) return;
       if (gameState.status !== 'PLAYING') return;
       if (paused) modalReturnFocus = document.activeElement;
       setPaused('manual', paused);
@@ -2020,7 +2050,7 @@
     }
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Tab') {
-        const topDialog = ['chapter-result','chapter-pause','modal-leaderboard','modal-endgame','modal-catalog','modal-pause'].map(id=>document.getElementById(id)).find(el=>!el.hidden&&!el.classList.contains('hidden'));
+        const topDialog = ['chase-entry','chase-result','chase-pause','chapter-result','chapter-pause','modal-leaderboard','modal-endgame','modal-catalog','modal-pause'].map(id=>document.getElementById(id)).find(el=>!el.hidden&&!el.classList.contains('hidden'));
         if (topDialog) {
           const focusable = [...topDialog.querySelectorAll('button:not([disabled]), a[href], input:not([disabled])')].filter(el=>!el.closest('.hidden,[hidden]'));
           const first=focusable[0], last=focusable[focusable.length-1];
@@ -2335,6 +2365,15 @@
       document.getElementById('modal-endgame').classList.remove('flex');
       chapter.start();
     });
+    document.getElementById('chase-entry-start').addEventListener('click',()=>{
+      document.getElementById('chase-entry').hidden=true;
+      document.getElementById('modal-pause').classList.add('hidden');pauseReasons.clear();clearInput();
+      document.getElementById('pause-state').classList.add('hidden');chapter.startChasePreview();
+    });
+    document.getElementById('chase-entry-back').addEventListener('click',()=>{
+      document.getElementById('chase-entry').hidden=true;setPaused('chapter-entry',false);
+    });
+    if(location.hash==='#chase'){document.getElementById('chase-entry').hidden=false;setPaused('chapter-entry',true);}
 
     let isDraggingCamera = false;
     let dragStartX = 0;
@@ -2392,7 +2431,7 @@
 
     renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
     window.addEventListener('pointercancel', clearInput);
-    renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); setPaused('graphics',true); showToast('显卡画面暂时中断，正在等待恢复。',6000); });
+    renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); setPaused('graphics',true); manualPause(true); showToast('显卡画面暂时中断，正在等待恢复。',6000); });
     renderer.domElement.addEventListener('webglcontextrestored', () => { setPaused('graphics',false); manualPause(true); showToast('画面已恢复，点击继续行动。'); });
 
     // =========================================================================

@@ -10,14 +10,18 @@
     const state = { active: false, phase: 'IDLE', time: 0, elapsed: 0, hp: 120, maxHp: 120,
       target: null, path: [], attack: null, cooldown: 0, combo: 0, invulnerable: 0,
       dodge: 0, dodgeCooldown: 0, dodgeDir: { x: 0, z: 1 }, kills: 0, hasKey: false,
-      paused: false, walkCycle: 0, shake: 0, guardReady: false };
+      paused: false, walkCycle: 0, shake: 0, guardReady: false, stun:0, hitstop:0,
+      impactZoom:0, encounter:false, recoil:{x:0,z:0}, hitFlash:0 };
     let showroom = [], originalBackground, originalFog, escortRoot, stationRoot, policeCar, door;
     let escorts = [], enemies = [], guard, boss, gate, nav, route = [], particles = [], obstacles = [], keyModel;
-    let transitionSwitched = false, lastHud = '';
+    let transitionSwitched = false, lastHud = '', combatFx=[], chase, squad=[];
     const focus = new T.Vector3(), desiredFocus = new T.Vector3();
     const playerActor = { group: player.group, body: player.bodyGroup, pos: player.pos,
       armL: player.armL, armR: player.armR, legL: player.legL, legR: player.legR, cycle: 0 };
     const disposables = [];
+    playerActor.hitMaterials=[];
+    player.group.traverse(o=>{for(const m of o.material?(Array.isArray(o.material)?o.material:[o.material]):[])
+      if(m.emissive&&!playerActor.hitMaterials.includes(m))playerActor.hitMaterials.push(m);});
 
     function material(color, roughness = .65, metalness = 0) {
       return new T.MeshStandardMaterial({ color, roughness, metalness });
@@ -59,8 +63,9 @@
         box(p,.26,.60,.29,0,-.3,0,uniform); box(p,.23,.21,.24,0,-.68,0,skin); return p;
       }
       const a = { name, group, body, pos: group.position, legL:leg(-.2), legR:leg(.2), armL:arm(-.51), armR:arm(.51),
-        hp:isBoss?220:54, maxHp:isBoss?220:54, boss:isBoss, cycle:0, mode:'IDLE', timer:0,
-        cooldown:1.0, attack:null, stun:0, alive:true, activated:false, flash:0, down:0, path:[], repath:0 };
+        hp:isBoss?300:76, maxHp:isBoss?300:76, boss:isBoss, cycle:0, mode:'IDLE', timer:0,
+        cooldown:1.0, attack:null, stun:0, alive:true, activated:false, flash:0, down:0, path:[], repath:0,
+        flinchCooldown:0,poise:0,sequence:0,recoil:{x:0,z:0},hitMaterials:[uniform,vest,skin] };
       box(body,.82,.94,.49,0,1.32,0,uniform); box(body,.68,.68,.08,0,1.35,.275,vest);
       box(body,.87,.12,.55,0,.94,0,black); box(body,.14,.11,.03,0,.94,.30,gold);
       box(body,.12,.18,.03,-.20,1.58,.33,gold);
@@ -71,6 +76,12 @@
         group.scale.setScalar(1.32); box(body,.20,.28,.58,-.48,1.67,0,vest); box(body,.20,.28,.58,.48,1.67,0,vest);
         box(body,.61,.15,.04,0,2.1,.27,black);
       }
+      // A visible baton follows the actual striking hand, including the wind-up.
+      const baton=new T.Group();baton.position.set(0,-.70,.08);a.armR.add(baton);
+      const shaft=new T.Mesh(new T.CylinderGeometry(isBoss?.075:.055,isBoss?.085:.065,isBoss?1.55:1.05,12),black);
+      shaft.position.y=-(isBoss?.60:.40);baton.add(shaft);
+      const collar=new T.Mesh(new T.CylinderGeometry(.085,.085,.10,12),steelMaterial());collar.position.y=-.12;baton.add(collar);
+      a.baton=baton;if(isBoss){const cap=new T.Mesh(new T.CylinderGeometry(.10,.10,.14,12),gold);cap.position.y=-1.35;baton.add(cap);}
       const shadow = assets.contactShadow(T,1.65,1.5,.55); shadow.position.y=.025; group.add(shadow);
       a.selection = ring(isBoss?1.2:.85,0xf7c86a,.95); a.selection.visible=false; group.add(a.selection);
       a.warning = new T.Mesh(new T.CircleGeometry(isBoss?2.9:1.75,48), new T.MeshBasicMaterial({
@@ -84,6 +95,7 @@
         new T.MeshBasicMaterial({visible:false})); hitbox.userData.officer=a;
       return a;
     }
+    function steelMaterial(){return material(0x8eafb6,.25,.8);}
     function animateBody(a, dt, walking, attack = null, cuffed = false) {
       a.cycle += dt * (walking?12:2);
       const swing=walking?Math.sin(a.cycle)*.68:0;
@@ -93,10 +105,39 @@
       a.body.position.y=walking?Math.abs(Math.sin(a.cycle))*.085:Math.sin(a.cycle)*.012;
       a.body.rotation.x=0; a.body.rotation.z=0;
       if(cuffed) { a.armL.rotation.x=.45; a.armR.rotation.x=.45; }
-      if(attack) {
-        const punch=Math.sin(clamp(attack.time/attack.duration,0,1)*Math.PI);
-        if(attack.kick) { a.legR.rotation.x=-1.65*punch; a.body.rotation.x=-.15*punch; a.armL.rotation.x=-.7; }
-        else { const arm=attack.left?a.armL:a.armR; arm.rotation.x=-2.25*punch; a.body.rotation.y+=.08*punch*(attack.left?-1:1); }
+      if(!cuffed&&['COMBAT','GUARD'].includes(state.phase)&&!walking) {
+        a.armL.rotation.x=-.7;a.armR.rotation.x=-.55;a.armL.rotation.z=.18;a.armR.rotation.z=-.18;
+        a.legL.rotation.x=.08;a.legR.rotation.x=-.15;
+      }
+      if(attack?.windup!==undefined) {
+        const t=attack.time,w=attack.windup,progress=clamp((t-w)/attack.strike,0,1);
+        a.body.rotation.y=attack.facing;
+        const raised=t<w?clamp(t/w,0,1):1-progress;
+        a.armR.rotation.x=-.5-raised*2.35;a.armR.rotation.z=-.2;
+        a.armL.rotation.x=-.8;a.body.rotation.x=t<w?-.14*raised:.30*Math.sin(progress*Math.PI);
+        if(attack.kind==='SWEEP') {
+          a.armR.rotation.x=-1.5;a.armR.rotation.z=-.65;
+          a.body.rotation.y=attack.facing+(t<w?-.8*raised:-.8+progress*2.1);
+        } else if(attack.kind==='RUSH') {
+          a.body.rotation.x=.30;a.armR.rotation.x=-1.2;a.armL.rotation.x=-.85;
+        }
+      } else if(attack) {
+        const t=clamp(attack.time/attack.duration,0,1),p=Math.sin(t*Math.PI),snap=Math.sin(Math.min(1,t/.62)*Math.PI);
+        a.body.rotation.y=attack.facing;
+        a.armL.rotation.x=-.65;a.armR.rotation.x=-.6;
+        if(attack.style==='JAB') {a.armL.rotation.x=-.65-1.65*snap;a.body.rotation.y-=.22*p;}
+        if(attack.style==='CROSS') {a.armR.rotation.x=-.6-1.8*snap;a.body.rotation.y+=.5*p;a.body.rotation.x=.15*p;}
+        if(attack.style==='HOOK') {a.armR.rotation.x=-1.6;a.armR.rotation.z=-1.0*p;a.body.rotation.y+=(-.8+1.7*t)*p;a.armL.rotation.x=-1.1;}
+        if(attack.style==='SPIN_KICK') {
+          a.body.rotation.y=attack.facing+Math.PI*2*t;a.legR.rotation.x=-1.8*p;
+          a.legL.rotation.x=.5*p;a.body.position.y+=.35*p;a.body.rotation.x=-.18*p;
+          a.armL.rotation.z=.7*p;a.armR.rotation.z=-.7*p;
+        }
+      }
+      const stun=a===playerActor?state.stun:a.stun;
+      if(stun>0){a.body.rotation.x=-.28;a.body.rotation.z=Math.sin(stun*27)*.15;a.armL.rotation.x=-1.0;a.armR.rotation.x=-1.0;}
+      if(a===playerActor&&state.dodge>0) {
+        a.body.position.y=.14;a.body.rotation.z=.48;a.legL.rotation.x=.6;a.legR.rotation.x=-.6;
       }
     }
     function face(a, p) { a.body.rotation.y=Math.atan2(p.x-a.pos.x,p.z-a.pos.z); }
@@ -143,6 +184,9 @@
       state.active=true;state.paused=false;state.elapsed=0;state.hp=120;state.target=null;state.hasKey=false;state.kills=0;
       state.attack=null;state.path=[];state.cooldown=0;state.invulnerable=0;state.dodge=0;state.dodgeCooldown=0;
       state.combo=0;state.guardReady=false;lastHud='';transitionSwitched=false;
+      state.stun=0;state.hitstop=0;state.encounter=false;state.hitFlash=0;state.recoil={x:0,z:0};
+      state.autoFight=false;state.impactZoom=0;state.messageTime=0;combatFx=[];
+      root.INMOPhysics?.load().catch(()=>{});
       showroom=scene.children.map(object=>({object,visible:object.visible}));
       originalBackground=scene.background; originalFog=scene.fog;
       player.isCrouching=false;player.bodyGroup.scale.set(1,1,1);player.bodyGroup.position.set(0,0,0);
@@ -161,7 +205,7 @@
       setPhase('ESCORT');sound.caughtSiren(); updateHud();
     }
     function buildStation() {
-      obstacles=[];enemies=[];particles=[];
+      obstacles=[];enemies=[];particles=[];squad=[];
       stationRoot=new T.Group();stationRoot.name='police-station-chapter';scene.add(stationRoot);
       const floor=material(0x30424c,.82), tile=material(0x344b54,.82), seam=material(0x1c303a), wall=material(0x41606d,.9);
       const base=material(0x182d3d,.72), steel=material(0x476171,.32,.75), dark=material(0x101f2c), brass=material(0xc6a258,.35,.65);
@@ -246,7 +290,7 @@
       const spots=[[-1,5],[4.8,6],[8.6,3.1],[7,-.3],[1.2,-2],[-3.6,-4.9],[6.8,-5.8]];
       const names=['值班警员','巡逻警员','走廊警卫','物证室警卫','执勤警员','值夜警卫','精英警卫'];
       spots.forEach((p,i)=>{const a=makeOfficer(names[i],p[0],p[1]);a.id=i+1;enemies.push(a);stationRoot.add(a.group);});
-      boss=makeOfficer('典狱长 · 铁拳',.4,-5.8,true);boss.group.visible=false;stationRoot.add(boss.group);
+      boss=makeOfficer('典狱长 · 铁棍',.4,-5.8,true);boss.group.visible=false;stationRoot.add(boss.group);
       assets.linearizeScene(stationRoot);
       nav=new rules.Navigator(walkable,.45);
     }
@@ -270,6 +314,7 @@
     function pickTarget(a) {
       if(!a?.alive)return;
       state.target=a;state.path=[];
+      if(a!==guard)state.autoFight=true;
       a.activated=true;
       if(a===guard)caption('机会只有一次','趁他靠近，拿到钥匙。','已锁定送饭警察 · 正在近身');
       else toast('锁定 '+a.name+' · 自动近身连击，空格闪避。',1700);
@@ -283,16 +328,56 @@
       const hits=ray.intersectObjects(candidates.map(a=>a.group),true);
       if(hits.length){let obj=hits[0].object;while(obj&&!candidates.some(a=>a.group===obj))obj=obj.parent;const a=candidates.find(a=>a.group===obj);if(a){pickTarget(a);return;}}
       const p=new T.Vector3();if(ray.ray.intersectPlane(new T.Plane(new T.Vector3(0,1,0),0),p)&&walkable(p.x,p.z)) {
-        state.target=null;state.path=nav.findPath(player.pos,p)||[];
+        state.target=null;state.autoFight=false;state.path=nav.findPath(player.pos,p)||[];
       }
     }
+    function combatMessage(text) {
+      $('chapter-combo').textContent=text;$('chapter-combo').hidden=false;state.messageTime=1.15;
+    }
     function beginAttack() {
-      if(!state.target?.alive||state.cooldown>0||state.attack||state.dodge>0)return;
-      const kick=state.combo%3===2;
-      state.attack={time:0,duration:kick?.56:.40,hit:false,kick,left:state.combo%2===0,target:state.target};
-      state.cooldown=kick?.65:.48;state.combo++;
+      if(!state.target?.alive||state.cooldown>0||state.attack||state.dodge>0||state.stun>0)return;
+      const styles=['JAB','CROSS','HOOK','SPIN_KICK'],names=['左刺拳','右直拳','摆拳','回旋飞踢'];
+      const index=state.combo%4,durations=[.34,.38,.44,.64];
       face(playerActor,state.target.pos);
-      sound.playTone(kick?160:260,'triangle',.06,.05);
+      state.attack={time:0,duration:durations[index],hit:false,kick:index===3,style:styles[index],target:state.target,
+        facing:player.bodyGroup.rotation.y,damage:[15,19,22,34][index]};
+      state.cooldown=durations[index]+.07;state.combo++;
+      combatMessage(names[index]+'  ·  '+state.combo+' 连击');
+      sound.playTone(index===3?170:380,'triangle',.055,.045);
+    }
+    function damageNumber(pos,amount,color) {
+      const canvas=document.createElement('canvas');canvas.width=128;canvas.height=64;
+      const ctx=canvas.getContext('2d');ctx.font='900 46px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.strokeStyle='#102232';ctx.lineWidth=7;ctx.strokeText(String(amount),64,32);ctx.fillStyle=color;ctx.fillText(String(amount),64,32);
+      const map=new T.CanvasTexture(canvas);map.encoding=T.sRGBEncoding;
+      const mesh=new T.Sprite(new T.SpriteMaterial({map,transparent:true,depthTest:false,toneMapped:false}));
+      mesh.position.set(pos.x,2.6,pos.z);mesh.scale.set(1.7,.85,1);stationRoot.add(mesh);
+      combatFx.push({mesh,life:.72,max:.72,vy:1.5,map});
+    }
+    function impactFlash(pos,heavy) {
+      const mesh=new T.Mesh(new T.RingGeometry(.06,heavy?.76:.48,8,1),new T.MeshBasicMaterial({
+        color:heavy?0xffdc8a:0xe4fff6,transparent:true,opacity:.9,side:T.DoubleSide,depthWrite:false,toneMapped:false}));
+      mesh.position.set(pos.x,1.4,pos.z);mesh.quaternion.copy(camera.quaternion);stationRoot.add(mesh);
+      combatFx.push({mesh,life:.16,max:.16,vy:0,expand:true});
+    }
+    function attackTrail(a,heavy,color=0xb9e9f5) {
+      const mesh=new T.Mesh(new T.RingGeometry(heavy?1.25:.7,heavy?1.55:.98,24,1,-.4,Math.PI*1.15),
+        new T.MeshBasicMaterial({color,transparent:true,opacity:.58,side:T.DoubleSide,depthWrite:false,toneMapped:false}));
+      mesh.rotation.set(-Math.PI/2,0,-a.body.rotation.y);mesh.position.set(a.pos.x,heavy?.7:1.5,a.pos.z);
+      stationRoot.add(mesh);combatFx.push({mesh,life:.18,max:.18,vy:0});
+    }
+    function updateFeedback(dt) {
+      state.shake=Math.max(0,state.shake-dt);state.impactZoom=Math.max(0,state.impactZoom-dt*8);
+      state.hitFlash=Math.max(0,state.hitFlash-dt*3);state.messageTime=Math.max(0,(state.messageTime||0)-dt);
+      $('chapter-impact').style.opacity=String(state.hitFlash*.65);
+      if(!state.messageTime)$('chapter-combo').hidden=true;
+      for(const a of [...enemies,guard,boss,playerActor].filter(Boolean)) {
+        a.flash=Math.max(0,(a.flash||0)-dt*5);
+        for(const mat of a.hitMaterials||[])if(mat.emissive)mat.emissive.setRGB(a.flash*.8,a.flash*.32,a.flash*.12);
+      }
+      for(let i=combatFx.length-1;i>=0;i--){const f=combatFx[i];f.life-=dt;f.mesh.position.y+=f.vy*dt;
+        f.mesh.material.opacity=Math.max(0,f.life/f.max);if(f.expand)f.mesh.scale.setScalar(1+(1-f.life/f.max)*1.3);
+        if(f.life<=0){stationRoot.remove(f.mesh);f.mesh.geometry?.dispose();f.mesh.material.dispose();f.map?.dispose();combatFx.splice(i,1);}}
     }
     function burst(pos,color=0xffd482,count=8) {
       for(let i=0;i<count;i++) {
@@ -314,32 +399,38 @@
         toast('获得拘留室钥匙 · 牢门已打开',3000);sound.stealSuccess();
       } else {
         if(!a.boss){state.kills++;state.hp=Math.min(state.maxHp,state.hp+9);toast('击倒 '+state.kills+'/7 · 恢复 9 点体力',1600);}
-        else {setPhase('ESCAPED');state.target=null;sound.victoryFanfare();caption('第二章完成','逃出警察局成功','原来，故事还可以这样发展。');}
+        else {setPhase('ESCAPED');state.target=null;sound.victoryFanfare();caption('第二章完成','逃出警察局成功','门外有一辆警车，钥匙还没拔……');}
       }
     }
     function hitEnemy(a,amount,kick) {
       if(!a.alive)return;
-      a.hp=Math.max(0,a.hp-amount);
-      // The boss keeps winding up through ordinary hits; dodging his attack matters.
-      if(!a.boss || (kick && (!a.attack || a.attack.time>=1.05))) {
-        a.stun=a.boss?.30:.42;a.attack=null;a.warning.material.opacity=0;
+      a.hp=Math.max(0,a.hp-amount);a.flash=1;a.poise+=kick?2:1;
+      // Normal hits visibly recoil, but cannot reset every enemy wind-up forever.
+      const flinch=a.boss?a.poise>=5:(kick||a.flinchCooldown<=0);
+      if(flinch) {
+        a.stun=a.boss?.5:(kick?.46:.24);a.attack=null;a.warning.material.opacity=0;
+        a.flinchCooldown=.9;a.poise=0;a.cooldown=a.boss?1:.28;
+        if(a.boss)combatMessage('破防！典狱长陷入硬直');
       }
-      burst(a.pos,kick?0xffc16e:0xd6f0ed);state.shake=kick?.11:.055;sound.playTone(kick?75:110,'square',.06,.055);
+      burst(a.pos,kick?0xffc16e:0xd6f0ed,kick?13:7);impactFlash(a.pos,kick);damageNumber(a.pos,amount,kick?'#ffcd70':'#e0ffff');
+      attackTrail(playerActor,kick);state.shake=kick?.22:.10;state.hitstop=kick?.085:.045;state.impactZoom=kick?1.2:.4;
+      sound.playTone(kick?65:105,'square',.065,.08);sound.playTone(kick?180:280,'triangle',.04,.035);
       const dx=a.pos.x-player.pos.x,dz=a.pos.z-player.pos.z,len=Math.hypot(dx,dz)||1;
-      const nx=a.pos.x+dx/len*(kick?.28:.12),nz=a.pos.z+dz/len*(kick?.28:.12);
-      if(walkable(nx,nz)){a.pos.x=nx;a.pos.z=nz;}
+      a.recoil={x:dx/len*(kick?4.0:1.2)*(a.boss?.45:1),z:dz/len*(kick?4.0:1.2)*(a.boss?.45:1)};
       if(a.hp<=0||a===guard)knockOut(a);
     }
-    function damagePlayer(amount,from) {
+    function damagePlayer(amount,from,heavy=false) {
       if(state.invulnerable>0||state.phase!=='COMBAT')return;
-      state.hp=Math.max(0,state.hp-amount);state.invulnerable=.65;state.shake=.15;burst(player.pos,0xf18b74,5);
-      sound.playTone(65,'sawtooth',.10,.06);
+      state.hp=Math.max(0,state.hp-amount);state.invulnerable=.62;state.stun=heavy?.48:.28;
+      state.attack=null;state.combo=0;state.path=[];playerActor.flash=1;state.hitFlash=1;state.shake=heavy?.3:.19;
+      state.hitstop=heavy?.09:.055;burst(player.pos,0xf18b74,9);impactFlash(player.pos,heavy);damageNumber(player.pos,amount,'#ff8b7a');
+      combatMessage(heavy?'重击！受击硬直':'被警棍击中 · 受击硬直');sound.playTone(65,'sawtooth',.10,.085);
       const dx=player.pos.x-from.x,dz=player.pos.z-from.z,len=Math.hypot(dx,dz)||1;
-      const nx=player.pos.x+dx/len*.4,nz=player.pos.z+dz/len*.4;if(walkable(nx,nz))player.pos.set(nx,0,nz);
+      state.recoil={x:dx/len*(heavy?5.0:3),z:dz/len*(heavy?5.0:3)};
       if(state.hp<=0){setPhase('DEFEAT');state.target=null;state.attack=null;showResult(false);}
     }
     function dodge() {
-      if(state.phase!=='COMBAT'||state.paused||state.dodgeCooldown>0)return;
+      if(state.phase!=='COMBAT'||state.paused||state.dodgeCooldown>0||state.stun>0)return;
       let x=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0),z=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0);
       if(x||z){const d=rules.screenMove(x,z,-16,23,0);x=d.x;z=d.z;}
       else if(state.target){x=player.pos.x-state.target.pos.x;z=player.pos.z-state.target.pos.z;}
@@ -349,7 +440,15 @@
     }
     function updatePlayer(dt) {
       state.cooldown=Math.max(0,state.cooldown-dt);state.invulnerable=Math.max(0,state.invulnerable-dt);state.dodgeCooldown=Math.max(0,state.dodgeCooldown-dt);
+      state.stun=Math.max(0,state.stun-dt);
+      if(Math.hypot(state.recoil.x,state.recoil.z)>.05){const nx=player.pos.x+state.recoil.x*dt,nz=player.pos.z+state.recoil.z*dt;
+        if(walkable(nx,player.pos.z))player.pos.x=nx;if(walkable(player.pos.x,nz))player.pos.z=nz;
+        state.recoil.x*=Math.exp(-dt*9);state.recoil.z*=Math.exp(-dt*9);}
       let walking=false;
+      if(state.autoFight&&state.phase==='COMBAT'&&!state.target?.alive) {
+        state.target=[...enemies,...(boss?.activated?[boss]:[])].filter(a=>a.alive).sort((a,b)=>distance(a.pos,player.pos)-distance(b.pos,player.pos))[0]||null;
+      }
+      if(state.stun>0){player.group.position.copy(player.pos);animateBody(playerActor,dt,false);return;}
       if(state.dodge>0) {
         state.dodge=Math.max(0,state.dodge-dt);const nx=player.pos.x+state.dodgeDir.x*10*dt,nz=player.pos.z+state.dodgeDir.z*10*dt;
         if(walkable(nx,player.pos.z))player.pos.x=nx;if(walkable(player.pos.x,nz))player.pos.z=nz;walking=true;
@@ -361,7 +460,7 @@
           if(walkable(nx,player.pos.z))player.pos.x=nx;if(walkable(player.pos.x,nz))player.pos.z=nz;
           if(!state.attack)face(playerActor,{x:player.pos.x+d.x,z:player.pos.z+d.z});walking=true;
         } else if(state.target?.alive) {
-          const target=state.target,range=target.boss?2.15:1.5;
+          const target=state.target,range=target.boss?2.05:1.45;
           if(distance(player.pos,target.pos)>range&&!state.attack) {
             if(!state.path.length||state.time-(state.repathAt||0)>.35){state.path=nav.findPath(player.pos,target.pos)||[];state.repathAt=state.time;}
             walking=moveAlong(playerActor,state.path,5,dt,true);
@@ -370,9 +469,9 @@
       }
       if(state.attack) {
         const attack=state.attack;attack.time+=dt;
-        if(!attack.hit&&attack.time>=attack.duration*.42) {
+        if(!attack.hit&&attack.time>=attack.duration*(attack.kick?.58:.46)) {
           attack.hit=true;const a=attack.target;
-          if(a.alive&&distance(player.pos,a.pos)<(a.boss?2.6:2.05))hitEnemy(a,attack.kick?29:18,attack.kick);
+          if(a.alive&&distance(player.pos,a.pos)<(a.boss?2.75:2.2))hitEnemy(a,attack.damage,attack.kick);
         }
         if(state.attack===attack&&attack.time>=attack.duration)state.attack=null;
       }
@@ -382,49 +481,82 @@
     }
     function updateEnemies(dt) {
       const alive=enemies.filter(a=>a.alive);
+      if(!state.encounter&&(player.pos.x> -4.15||state.target&&state.target!==guard&&distance(player.pos,state.target.pos)<3)) {
+        state.encounter=true;sound.caughtSiren();toast('警报响起 · 三名警卫正在包围你',2500);
+      }
       if(state.kills===7&&!boss.activated) {
         boss.activated=true;boss.group.visible=true;boss.cooldown=1.8;state.hp=Math.min(state.maxHp,state.hp+35);
-        caption('最后一道门','典狱长 · 铁拳','橙色圆圈蓄满前闪避，趁他收招时近身。');
+        caption('最后一道门','典狱长 · 铁棍','留意举棍、横扫和冲刺 · 连击积累破防，重击前闪避');
         toast('Boss 登场 · 恢复 35 点体力',3500);sound.caughtSiren();
       }
       const candidates=[...alive,...(boss.activated&&boss.alive?[boss]:[])];
-      const nearby=candidates.filter(a=>distance(a.pos,player.pos)<7.5||state.target===a).sort((a,b)=>distance(a.pos,player.pos)-distance(b.pos,player.pos));
-      const attackers=new Set(nearby.slice(0,2));
+      const nearby=[...candidates].sort((a,b)=>(a===state.target?-2:0)+distance(a.pos,player.pos)-(b===state.target?-2:0)-distance(b.pos,player.pos));
+      squad=squad.filter(a=>candidates.includes(a));
+      if(state.encounter){
+        if(state.target?.alive&&state.target!==guard&&!squad.includes(state.target)&&distance(state.target.pos,player.pos)<5){
+          if(squad.length>=3)squad.sort((a,b)=>distance(a.pos,player.pos)-distance(b.pos,player.pos)).pop();squad.push(state.target);
+        }
+        for(const a of nearby)if(squad.length<3&&!squad.includes(a))squad.push(a);
+      }
+      const attackers=state.encounter?squad:[];
+      $('chapter-squad').textContent=attackers.length?'围攻 '+attackers.length+' 人':'走出牢门后，警卫会围攻';
       for(const a of candidates) {
-        const d=distance(a.pos,player.pos);a.cooldown=Math.max(0,a.cooldown-dt);a.stun=Math.max(0,a.stun-dt);
+        let d=distance(a.pos,player.pos);a.cooldown=Math.max(0,a.cooldown-dt);a.stun=Math.max(0,a.stun-dt);a.flinchCooldown=Math.max(0,a.flinchCooldown-dt);
+        if(Math.hypot(a.recoil.x,a.recoil.z)>.08){const nx=a.pos.x+a.recoil.x*dt,nz=a.pos.z+a.recoil.z*dt;
+          if(walkable(nx,a.pos.z))a.pos.x=nx;if(walkable(a.pos.x,nz))a.pos.z=nz;a.recoil.x*=Math.exp(-dt*8);a.recoil.z*=Math.exp(-dt*8);}
         let walking=false;
         if(a.stun>0){animateBody(a,dt,false);continue;}
         if(a.attack) {
-          a.attack.time+=dt;const windup=a.boss?1.05:.70, duration=a.boss?1.65:1.12;
-          a.warning.material.opacity=a.attack.time<windup?.10+.35*a.attack.time/windup:0;
-          if(!a.attack.hit&&a.attack.time>=windup){a.attack.hit=true;if(d<(a.boss?3:1.95))damagePlayer(a.boss?16:7,a.pos);}
-          if(a.attack.time>=duration){a.attack=null;a.cooldown=a.boss?1.1:1.2;a.warning.material.opacity=0;}
-        } else if(attackers.has(a)&&state.hasKey) {
+          const atk=a.attack;atk.time+=dt;
+          a.warning.material.opacity=atk.time<atk.windup?.08+.36*atk.time/atk.windup:0;
+          if(atk.kind==='RUSH'&&atk.time>=atk.windup&&atk.time<atk.windup+atk.strike) {
+            const nx=a.pos.x+Math.sin(atk.facing)*9*dt,nz=a.pos.z+Math.cos(atk.facing)*9*dt;
+            if(walkable(nx,a.pos.z))a.pos.x=nx;if(walkable(a.pos.x,nz))a.pos.z=nz;
+          }
+          d=distance(a.pos,player.pos);
+          if(!atk.hit&&atk.time>=atk.windup) {
+            atk.hit=true;attackTrail(a,a.boss,0xffa366);sound.playTone(a.boss?110:220,'triangle',.08,.045);
+            if(atk.kind!=='RUSH'&&d<atk.reach)damagePlayer(atk.damage,a.pos,a.boss);
+          }
+          if(atk.kind==='RUSH'&&!atk.rushHit&&atk.time>=atk.windup&&atk.time<atk.windup+atk.strike&&d<2.4){
+            atk.rushHit=true;damagePlayer(atk.damage,a.pos,true);}
+          if(atk.time>=atk.duration){a.attack=null;a.cooldown=a.boss?.9:(.65+(a.id%3)*.2);a.warning.material.opacity=0;}
+        } else if(attackers.includes(a)&&state.hasKey) {
           a.activated=true;face(a,player.pos);
-          if(d>(a.boss?2.4:1.65)) {
-            a.repath-=dt;if(a.repath<=0){a.path=nav.findPath(a.pos,player.pos)||[];a.repath=.65;}
-            walking=moveAlong(a,a.path,a.boss?2.25:2.1,dt,true);
-          } else if(a.cooldown<=0){a.attack={time:0,duration:a.boss?1.65:1.12,hit:false,kick:a.boss};a.path=[];}
+          const slot=attackers.indexOf(a),angle=slot*Math.PI*2/3+.4+Math.sin(state.time*.3)*.35;
+          let goal={x:player.pos.x+Math.sin(angle)*1.6,z:player.pos.z+Math.cos(angle)*1.6};
+          if(!walkable(goal.x,goal.z))goal={x:player.pos.x,z:player.pos.z};
+          const canRush=a.boss&&d>4&&d<10&&a.cooldown<=0&&nav.clear(a.pos,player.pos);
+          if(a.cooldown<=0&&(d<(a.boss?3.1:2.15)||canRush)) {
+            const kind=canRush?'RUSH':a.boss?(a.sequence%2?'SWEEP':'OVERHEAD'):'BATON';a.sequence++;
+            const windup=a.boss?(kind==='RUSH'?.8:kind==='SWEEP'?.68:.85):.43+(a.id%3)*.06;
+            const strike=kind==='RUSH'?.55:.24,recovery=a.boss?.70:.50;
+            a.attack={kind,time:0,windup,strike,duration:windup+strike+recovery,hit:false,rushHit:false,
+              facing:Math.atan2(player.pos.x-a.pos.x,player.pos.z-a.pos.z),reach:a.boss?3.5:2.45,damage:a.boss?18:6};
+            a.path=[];a.warning.scale.setScalar(a.boss?1.12:1.42);
+          } else if(d>(a.boss?2.7:1.65)) {
+            a.repath-=dt;if(a.repath<=0){a.path=nav.findPath(a.pos,goal)||[];a.repath=.38;}
+            walking=moveAlong(a,a.path,a.boss?3.15:3.35,dt,true);
+          }
         }
-        // Keep fighters from occupying the same point, with collision-aware separation.
-        for(const b of candidates)if(b!==a&&distance(a.pos,b.pos)<.8){const dx=a.pos.x-b.pos.x,dz=a.pos.z-b.pos.z,len=Math.hypot(dx,dz)||1;
-          const nx=a.pos.x+dx/len*dt,nz=a.pos.z+dz/len*dt;if(walkable(nx,nz)){a.pos.x=nx;a.pos.z=nz;}}
-        let anim=a.attack&&a.attack.time>(a.boss?1.0:.65)?{time:a.attack.time-(a.boss?1.0:.65),duration:.45,kick:a.boss}:null;
-        animateBody(a,dt,walking,anim);
+        for(const b of candidates)if(b!==a&&distance(a.pos,b.pos)<1.0){const dx=a.pos.x-b.pos.x,dz=a.pos.z-b.pos.z,len=Math.hypot(dx,dz)||1;
+          const nx=a.pos.x+dx/len*dt*2,nz=a.pos.z+dz/len*dt*2;if(walkable(nx,nz)){a.pos.x=nx;a.pos.z=nz;}}
+        animateBody(a,dt,walking,a.attack);
       }
     }
     function showResult(win) {
       $('chapter-result').hidden=false;$('chapter-result-kicker').textContent=win?'CHAPTER 02 / COMPLETE':'CHAPTER 02 / TRY AGAIN';
       $('chapter-result-title').textContent=win?'逃出警察局成功':'被重新关回去了';
-      $('chapter-result-copy').textContent=win?'7 名警卫与典狱长已全部击倒。门外的夜色，终于属于你。':'钥匙已经拿到过一次。调整走位，看到攻击预警时用空格闪避。';
+      $('chapter-result-copy').textContent=win?'7 名警卫与典狱长已全部击倒。外面那辆警车的钥匙还没拔……即将进入第三章追逐。':'钥匙已经拿到过一次。调整走位，看到攻击预警时用空格闪避。';
       const m=Math.floor(state.elapsed/60),s=Math.floor(state.elapsed%60);
       $('chapter-result-stats').textContent=`警卫 ${state.kills}/7  ·  Boss ${boss?.alive?'未击倒':'已击倒'}  ·  ${m}:${String(s).padStart(2,'0')}`;
-      $('chapter-retry').hidden=win;$(win?'chapter-result-restart':'chapter-retry').focus();
+      $('chapter-retry').hidden=win;$('chapter-next-chase').hidden=!win;$(win?'chapter-next-chase':'chapter-retry').focus();
     }
     function retryStation() {
       $('chapter-result').hidden=true;$('chapter-pause').hidden=true;state.paused=false;
       state.hp=120;state.kills=0;state.combo=0;state.attack=null;state.target=null;state.cooldown=0;state.elapsed=0;
       state.dodge=0;state.invulnerable=1;state.path=[];state.guardReady=false;state.repathAt=0;
+      state.stun=0;state.hitstop=0;state.encounter=false;state.autoFight=false;state.combo=0;state.recoil={x:0,z:0};combatFx=[];
       releaseGroup(stationRoot);stationRoot=null;enterCell();
     }
     function updateHud() {
@@ -440,8 +572,12 @@
       $('chapter-speech').hidden=state.phase!=='GUARD'||!state.guardReady;
     }
     function update(dt) {
-      if(!state.active||state.paused)return;
-      state.time+=dt;state.elapsed+=dt;state.shake=Math.max(0,state.shake-dt);
+      if(!state.active)return;
+      if(state.phase==='CHASE'){chase.update(dt);return;}
+      if(state.paused)return;
+      updateFeedback(dt);
+      if(state.hitstop>0&&['COMBAT','GUARD'].includes(state.phase)){state.hitstop=Math.max(0,state.hitstop-dt);updateHud();return;}
+      state.time+=dt;state.elapsed+=dt;
       if(escortRoot?.visible) {
         const flash=Math.sin(state.time*11)>0;policeCar.userData.beacons.forEach((m,i)=>m.material.opacity=(flash===(i===0))?1:.22);
         policeCar.userData.light.color.setHex(flash?0xf23b50:0x318bff);
@@ -478,9 +614,11 @@
         keyModel.rotation.y+=dt*3;keyModel.position.y=2.85+Math.sin(state.time*4)*.12;
         animateBody(playerActor,dt,false);if(state.time>1.5){keyModel.visible=false;setPhase('COMBAT');$('chapter-dodge').hidden=false;caption('第二章 / 警局突围','击倒 7 名警卫，再挑战典狱长。','点击敌人自动追击 · 点击地面走位 · WASD 移动 · 空格闪避');}
       } else if(state.phase==='COMBAT') {
+        $('chapter-auto-attack').hidden=false;
         updatePlayer(dt);if(state.phase==='COMBAT')updateEnemies(dt);
       } else if(state.phase==='ESCAPED') {
         animateBody(playerActor,dt,false);if(state.time>1.3&&$('chapter-result').hidden)showResult(true);
+        if(state.time>8.5)beginChase();
       }
       for(const a of [...enemies,guard,boss].filter(Boolean)) {
         if(!a.alive){a.down=Math.min(1,a.down+dt*3);a.body.rotation.z=-a.down*Math.PI/2;a.body.position.y=a.down*.43;}
@@ -494,6 +632,8 @@
     }
     function updateCamera(dt) {
       if(!state.active)return;
+      if(state.phase==='CHASE'){chase.updateCamera(dt);return;}
+      const fov=33-state.impactZoom;if(Math.abs(camera.fov-fov)>.03){camera.fov=fov;camera.updateProjectionMatrix();}
       const station=stationRoot?.visible;
       if(station){desiredFocus.set(player.pos.x*.58,.5,player.pos.z*.52);}
       else if(state.phase==='DRIVE'||state.phase==='TRANSITION')desiredFocus.copy(policeCar.position).add(new T.Vector3(0,.5,0));
@@ -502,22 +642,25 @@
       const fit=Math.max(1,Math.min(1.65,1.06/camera.aspect));
       const scale=station ? .86 : .76;
       camera.position.set(focus.x-16*fit*scale,focus.y+28*fit*scale,focus.z+23*fit*scale);
-      if(state.shake>0)camera.position.x+=Math.sin(state.time*73)*state.shake;
+      if(state.shake>0)camera.position.x+=Math.sin(performance.now()*.073)*state.shake;
       camera.lookAt(focus);
       if(state.phase==='GUARD'&&state.guardReady){const v=guard.pos.clone().add(new T.Vector3(0,3.2,0)).project(camera);
         $('chapter-speech').style.left=((v.x*.5+.5)*window.innerWidth)+'px';$('chapter-speech').style.top=((-v.y*.5+.5)*window.innerHeight)+'px';}
     }
     function pause(value) {
-      if(!state.active||['ESCAPED','DEFEAT'].includes(state.phase))return;
+      if(state.phase==='CHASE'){chase.pause(value);return;}
+      if(!state.active||state.phase==='DEFEAT')return;
       state.paused=value;context.clearInput();$('chapter-pause').hidden=!value;
       if(value)$('chapter-resume').focus();
     }
     function key(event) {
+      if(state.phase==='CHASE'){chase.key(event);return;}
       const k=event.key.toLowerCase();
       if(['escape','p'].includes(k)){if(!event.repeat)pause(!state.paused);return;}
       if(state.paused||event.repeat)return;
       if(k===' '||k==='shift')dodge();
       if(k==='e'&&state.phase==='GUARD'&&state.guardReady)pickTarget(guard);
+      if(k==='f'&&state.phase==='COMBAT')attackNearest();
     }
     function releaseGroup(group) {
       if(!group)return;scene.remove(group);const geos=new Set(),mats=new Set();
@@ -526,6 +669,7 @@
     }
     function stop() {
       if(!state.active)return;
+      chase.stop();
       state.active=false;state.paused=false;state.phase='IDLE';
       showroom.forEach(({object,visible})=>object.visible=visible);showroom=[];
       scene.background=originalBackground;scene.fog=originalFog;
@@ -533,12 +677,29 @@
       disposables.splice(0).forEach(t=>t.dispose());
       player.group.visible=true;player.ringMesh.visible=true;player.bodyGroup.rotation.set(0,0,0);player.bodyGroup.position.set(0,0,0);
       player.ringMesh.material.opacity=.9;
+      for(const m of playerActor.hitMaterials)m.emissive.setRGB(0,0,0);
+      camera.fov=33;camera.near=.5;camera.far=160;camera.updateProjectionMatrix();
       for(const a of [player.armL,player.armR,player.legL,player.legR])a.rotation.set(0,0,0);
       player.legL.position.set(-.19,.85,0);player.legR.position.set(.19,.85,0);
       hideOriginalHUD(false);
       document.body.classList.remove('chapter-cinematic');
+      combatFx=[];$('chapter-impact').style.opacity='0';$('chapter-combo').hidden=true;$('chapter-auto-attack').hidden=true;
       for(const id of ['chapter-hud','chapter-transition','chapter-pause','chapter-result','chapter-speech'])$(id).hidden=true;
     }
+    function attackNearest(){
+      if(state.phase!=='COMBAT'||state.paused)return;
+      const a=[...enemies,...(boss?.activated?[boss]:[])].filter(a=>a.alive).sort((a,b)=>distance(a.pos,player.pos)-distance(b.pos,player.pos))[0];
+      if(a)pickTarget(a);
+    }
+    function beginChase(){
+      if(state.phase==='CHASE')return;
+      state.paused=false;context.clearInput();$('chapter-result').hidden=true;$('chapter-pause').hidden=true;$('chapter-speech').hidden=true;
+      $('chapter-transition').hidden=true;setPhase('CHASE');chase.start();
+    }
+    function startChasePreview(){if(!state.active)start();beginChase();}
+    chase=root.HighwayChase.create(context);
+    $('chapter-next-chase').addEventListener('click',beginChase);
+    $('chapter-auto-attack').addEventListener('click',attackNearest);
     $('chapter-cell-action').addEventListener('click',()=>{if(state.guardReady)pickTarget(guard);});
     $('chapter-dodge').addEventListener('click',dodge);
     $('chapter-pause-button').addEventListener('click',()=>pause(true));
@@ -548,8 +709,8 @@
     $('chapter-retry').addEventListener('click',retryStation);
     window.addEventListener('blur',()=>{if(state.active&&!state.paused)pause(true);});
     document.addEventListener('visibilitychange',()=>{if(document.hidden&&state.active&&!state.paused)pause(true);});
-    return { state, start, stop, update, updateCamera, pointer, key, pause,
-      get active(){return state.active;},get paused(){return state.paused;} };
+    return { state, start, stop, update, updateCamera, pointer, key, pause, startChasePreview,
+      get active(){return state.active;},get paused(){return state.phase==='CHASE'?chase.paused:state.paused;} };
   }
   root.PoliceChapter={create};
 })(typeof window!=='undefined'?window:globalThis);
