@@ -12,6 +12,11 @@ input { user-select: text; -webkit-user-select: text; }
 .mission-list .mission-row { min-height: 25px; font-size: 11px; }
 .mission-eyebrow { font-size: 8px; letter-spacing: .18em; }
 .mission-title { margin-top: 4px; }
+.mission-title h1 { white-space: nowrap; }
+.mission-heading > div { min-width: 0; flex: 1; }
+.mission-title { gap: 5px; }
+.mission-panel.collapsed .mission-title h1 { font-size: 11px; }
+.mission-panel.collapsed .mission-toggle { flex-shrink: 0; padding: 3px 5px; }
 .mission-footer { padding-top: 8px; margin-top: 7px; }
 .mission-toggle { min-height: 30px; }
 #top-right-hud { top: var(--ui-edge); right: var(--ui-edge); width: 206px; padding: 9px 11px; }

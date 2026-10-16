@@ -2,6 +2,8 @@
 
 Three.js 45° 俯视潜行小游戏。玩家从街道进入半剖面的 INMO 展厅，在红色摄像头扇形视野和店员黄色视线之间寻找时机，取走六个柜台上的眼镜。
 
+[在线游玩](https://inmo-ar-stealth-game.netlify.app) · [GitHub 源码](https://github.com/elfwind724/inmo-ar-stealth-game)
+
 ## 操作
 
 - `WASD` / 方向键：按画面方向移动；触屏设备显示方向按钮
