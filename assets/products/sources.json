@@ -1,0 +1,39 @@
+[
+  {
+    "code": "air1",
+    "source": "https://static.leiphone.com/uploads/new/images/20220425/62667545025f5.png?imageView2/2/w/740",
+    "page": "https://www.leiphone.com/category/industrynews/0d1ucsnmAHQrTqtO.html",
+    "bytes": 180125,
+    "kind": "INMO product launch image"
+  },
+  {
+    "code": "air2",
+    "source": "https://support.inmoxr.com/images/products/inmo-air2-800x400.png",
+    "page": "https://support.inmoxr.com/",
+    "bytes": 129068
+  },
+  {
+    "code": "air3",
+    "source": "https://support.inmoxr.com/images/products/inmo-air3-800x400.png",
+    "page": "https://support.inmoxr.com/",
+    "bytes": 132565
+  },
+  {
+    "code": "go1",
+    "source": "https://support.inmoxr.com/images/products/inmo-go-800x400.png",
+    "page": "https://support.inmoxr.com/",
+    "bytes": 118919
+  },
+  {
+    "code": "go2",
+    "source": "https://support.inmoxr.com/images/products/inmo-go2-800x400.png",
+    "page": "https://support.inmoxr.com/",
+    "bytes": 126409
+  },
+  {
+    "code": "go3",
+    "source": "https://cdn.shopify.com/s/files/1/0551/5657/2294/files/01_e38e9f13-e819-4566-8b6c-bed24b3470b8.png?v=1789095502&width=600",
+    "page": "https://www.inmo.com/products/inmo-go3",
+    "bytes": 77642
+  }
+]

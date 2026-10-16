@@ -216,6 +216,7 @@
   </style>
   <link rel="stylesheet" href="./ui-polish.css">
   <script src="./game-rules.js"></script>
+  <script src="./showroom-assets.js"></script>
 </head>
 <body>
   <!-- 3D WebGL Viewport -->
@@ -458,7 +459,7 @@
         priceType: '官方零售价',
         priceSource: 'https://www.paoka.com/product/INMO-Air2',
         scorePoints: 3999,
-        spec: '双目全彩Micro-OLED无线AR眼镜 · 银白镜腿 + 中置AI镜头 · IMOS 2.0',
+        spec: '双目全彩无线 AR 眼镜 · 哑光黑框 · 粗镜腿与前置传感器',
         pos: { x: 0.0, z: -4.2 }, // Top-Middle Counter #2
         stolen: false
       },
@@ -472,7 +473,7 @@
         priceType: '公开指导价',
         priceSource: 'https://news.43y.com.cn/n/9337.html',
         scorePoints: 4999,
-        spec: '1080P索尼全彩OLED旗舰全功能AR眼镜 · 无框护目镜造型 · 16MP相机',
+        spec: '1080P 全彩波导 AR 眼镜 · 黑色镜框 · 中置相机',
         pos: { x: 8.2, z: -4.2 }, // Top-Right Counter #3
         stolen: false
       },
@@ -500,7 +501,7 @@
         priceType: '公开定价',
         priceSource: 'https://news.43y.com.cn/n/9337.html',
         scorePoints: 3999,
-        spec: '双目波导离线同传翻译AR眼镜 · 冰透灰半透明镜框 + 黑色智能镜腿',
+        spec: '双目波导翻译 AR 眼镜 · 石墨灰镜框与智能镜腿',
         pos: { x: 2.2, z: 2.3 }, // Bottom-Middle Counter #5
         stolen: false
       },
@@ -710,12 +711,12 @@
     // =========================================================================
     const container = document.getElementById('game-canvas-container');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x181f29);
-    scene.fog = new THREE.FogExp2(0x181f29, 0.008);
+    scene.background = new THREE.Color(0x101925).convertSRGBToLinear();
+    scene.fog = new THREE.FogExp2(new THREE.Color(0x101925).convertSRGBToLinear(), 0.003);
 
     // Orthographic-like 45-degree Isometric Perspective Camera
-    const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 0.5, 160);
-    const DEFAULT_CAM_OFFSET = new THREE.Vector3(-14, 25, 22); // 45-degree isometric angle matching Image 1
+    const camera = new THREE.PerspectiveCamera(33, window.innerWidth / window.innerHeight, 0.5, 160);
+    const DEFAULT_CAM_OFFSET = new THREE.Vector3(-16, 28, 23);
     let camYawOffset = 0.0;
     const cameraTarget = new THREE.Vector3(0, 0.5, 1.5);
 
@@ -724,17 +725,17 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, window.innerWidth < 700 ? 1.5 : 2));
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 0.9;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
     // Lighting
-    const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.72);
+    const hemiLight = new THREE.HemisphereLight(0xc4ddf2, 0x152030, 0.40);
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.75);
-    dirLight.position.set(-18, 32, 20);
+    const dirLight = new THREE.DirectionalLight(0xffe4c3, 1.15);
+    dirLight.position.set(-10, 18, 12);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
@@ -745,13 +746,19 @@
     dirLight.shadow.camera.right = d;
     dirLight.shadow.camera.top = d;
     dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.bias = -0.00015;
+    dirLight.shadow.normalBias = 0.025;
+    dirLight.shadow.radius = 3;
     scene.add(dirLight);
+    const rimLight = new THREE.DirectionalLight(0x7cb6e2, 0.65);
+    rimLight.position.set(10, 12, -10);scene.add(rimLight);
+    if (renderer.isWebGLRenderer) scene.environment = INMOAssets.createStudioEnvironment(THREE, renderer);
 
     // Warm store interior ceiling bounce lights
-    const storeLight1 = new THREE.PointLight(0xe0f2fe, 0.55, 28);
+    const storeLight1 = new THREE.PointLight(0xffdda5, 0.45, 22);
     storeLight1.position.set(-5, 8, -2);
     scene.add(storeLight1);
-    const storeLight2 = new THREE.PointLight(0xe0f2fe, 0.55, 28);
+    const storeLight2 = new THREE.PointLight(0x9bd8fa, 0.45, 22);
     storeLight2.position.set(6, 8, -2);
     scene.add(storeLight2);
 
@@ -767,6 +774,7 @@
       }
       drawFn(ctx, width, height);
       const tex = new THREE.CanvasTexture(c);
+      tex.encoding = THREE.sRGBEncoding;
       tex.anisotropy = 4;
       return tex;
     }
@@ -796,11 +804,11 @@
 
       // 1. Showroom Tiled Floor (X: -14..14, Z: -10..6)
       const floorTex = makeTextTexture({
-        width: 512, height: 512, bg: '#b8b5ad',
+        width: 512, height: 512, bg: '#344450',
         drawFn(ctx, w, h) {
-          ctx.strokeStyle = '#9e9b93';
-          ctx.lineWidth = 3;
-          const step = 64;
+          ctx.strokeStyle = '#4b5a64';
+          ctx.lineWidth = 2;
+          const step = 128;
           for (let i = 0; i <= w; i += step) {
             ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke();
@@ -813,7 +821,7 @@
 
       const storeFloor = new THREE.Mesh(
         new THREE.PlaneGeometry(28, 16),
-        new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.35, metalness: 0.08 })
+        new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.47, metalness: 0.18, envMapIntensity: 0.4 })
       );
       storeFloor.rotation.x = -Math.PI / 2;
       storeFloor.position.set(0, 0.01, -2);
@@ -822,11 +830,11 @@
 
       // 2. Sidewalk outside (Front Z: 6..12.8 & Left X: -22..-14)
       const sidewalkTex = makeTextTexture({
-        width: 512, height: 512, bg: '#73767a',
+        width: 512, height: 512, bg: '#293847',
         drawFn(ctx, w, h) {
-          ctx.strokeStyle = '#5c5f63';
-          ctx.lineWidth = 4;
-          const step = 64;
+          ctx.strokeStyle = '#394b59';
+          ctx.lineWidth = 3;
+          const step = 128;
           for (let i = 0; i <= w; i += step) {
             ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke();
@@ -835,7 +843,7 @@
       });
       sidewalkTex.wrapS = THREE.RepeatWrapping;
       sidewalkTex.wrapT = THREE.RepeatWrapping;
-      sidewalkTex.repeat.set(12, 8);
+      sidewalkTex.repeat.set(8, 5);
 
       const sidewalkMesh = new THREE.Mesh(
         new THREE.PlaneGeometry(44, 30),
@@ -907,8 +915,8 @@
       envGroup.add(floorMat);
 
       // 4. Cutaway Store Walls (Back Wall Z=-10, Left Wall X=-14, Right Wall X=14)
-      const wallMatLight = new THREE.MeshStandardMaterial({ color: 0xcbd0d6, roughness: 0.6 });
-      const wallMatDark = new THREE.MeshStandardMaterial({ color: 0x22262c, roughness: 0.5 });
+      const wallMatLight = new THREE.MeshStandardMaterial({ color: 0x3c4b58, roughness: 0.82 });
+      const wallMatDark = new THREE.MeshStandardMaterial({ color: 0x14232e, roughness: 0.7 });
 
       // Back Wall Left & Right light segments
       const backWallL = new THREE.Mesh(new THREE.BoxGeometry(8, 7.2, 0.45), wallMatLight);
@@ -950,13 +958,13 @@
 
       // Left Wall (X = -14) with "INMO / GLASSES PEOPLE MORE" typography
       const leftWallTex = makeTextTexture({
-        width: 1024, height: 512, bg: '#c5cacf',
+        width: 1024, height: 512, bg: '#34434e',
         drawFn(ctx, w, h) {
-          ctx.fillStyle = '#22262c';
+          ctx.fillStyle = '#c7dce5';
           ctx.font = '900 72px Inter, sans-serif';
           ctx.fillText('INMO', 140, 200);
           ctx.font = '500 34px Inter, sans-serif';
-          ctx.fillStyle = '#475569';
+          ctx.fillStyle = '#91abb9';
           ctx.fillText('GLASSES', 140, 275);
           ctx.fillText('PEOPLE', 140, 320);
           ctx.fillText('MORE', 140, 365);
@@ -1037,7 +1045,7 @@
       recGroup.position.set(-0.2, 0, -7.6);
       const recBody = new THREE.Mesh(
         new THREE.BoxGeometry(7.6, 1.35, 1.6),
-        new THREE.MeshStandardMaterial({ color: 0xe5e7eb, roughness: 0.35 })
+        new THREE.MeshStandardMaterial({ color: 0x283a47, roughness: 0.4, metalness: .22 })
       );
       recBody.position.y = 0.68;
       recBody.castShadow = true;
@@ -1064,6 +1072,12 @@
       monStand.position.set(0.3, 1.45, 0);
       recGroup.add(monStand);
       envGroup.add(recGroup);
+      const backLight = new THREE.Mesh(new THREE.BoxGeometry(26.8,.055,.08),new THREE.MeshBasicMaterial({color:0x9edcf0,toneMapped:false}));
+      backLight.position.set(0,6.72,-9.62);envGroup.add(backLight);
+      for(const x of [-13.65,13.65]){
+        const wallLight=new THREE.Mesh(new THREE.BoxGeometry(.045,5.6,.045),new THREE.MeshBasicMaterial({color:0xe6bd8d,toneMapped:false}));
+        wallLight.position.set(x,3.2,-8.9);envGroup.add(wallLight);
+      }
       addBoxCollider(-0.2, -7.6, 8.0, 2.0);
 
       // Wall Shelves on Left Wall & Right Back
@@ -1122,35 +1136,37 @@
       const glassMat = new THREE.MeshStandardMaterial({
         color: 0x93c5fd,
         transparent: true,
-        opacity: 0.18,
+        opacity: 0.035,
+        depthWrite: false,
         roughness: 0.1,
         metalness: 0.2
       });
 
       // Door Pillars at X = -3.1 and X = 1.1
       [-14.0, -3.1, 1.1, 14.0].forEach(px => {
-        const pil = new THREE.Mesh(new THREE.BoxGeometry(0.75, 4.3, 0.75), pillarMat);
-        pil.position.set(px, 2.15, 6.0);
+        const height = Math.abs(px)>10 ? 1.0 : 2.6;
+        const pil = new THREE.Mesh(new THREE.BoxGeometry(0.45, height, 0.45), pillarMat);
+        pil.position.set(px, height/2, 6.0);
         pil.castShadow = true;
         envGroup.add(pil);
       });
 
       // Left Storefront Glass Panel (X: -13.6 to -3.5)
-      const leftGlass = new THREE.Mesh(new THREE.BoxGeometry(10.1, 3.6, 0.12), glassMat);
-      leftGlass.position.set(-8.55, 1.9, 6.0);
+      const leftGlass = new THREE.Mesh(new THREE.BoxGeometry(10.1, .55, 0.08), glassMat);
+      leftGlass.position.set(-8.55, .3, 6.0);
       envGroup.add(leftGlass);
       // Top beam left
       const beamL = new THREE.Mesh(new THREE.BoxGeometry(10.9, 0.32, 0.35), mullionMat);
-      beamL.position.set(-8.55, 3.85, 6.0);
+      beamL.position.set(-8.55, .32, 6.0);
       envGroup.add(beamL);
       addBoxCollider(-8.55, 6.0, 10.5, 0.75);
 
       // Right Storefront Glass Panel (X: 1.5 to 13.6)
-      const rightGlass = new THREE.Mesh(new THREE.BoxGeometry(12.1, 3.6, 0.12), glassMat);
-      rightGlass.position.set(7.55, 1.9, 6.0);
+      const rightGlass = new THREE.Mesh(new THREE.BoxGeometry(12.1, .55, 0.08), glassMat);
+      rightGlass.position.set(7.55, .3, 6.0);
       envGroup.add(rightGlass);
       const beamR = new THREE.Mesh(new THREE.BoxGeometry(12.9, 0.32, 0.35), mullionMat);
-      beamR.position.set(7.55, 3.85, 6.0);
+      beamR.position.set(7.55, .32, 6.0);
       envGroup.add(beamR);
       addBoxCollider(7.55, 6.0, 12.5, 0.75);
 
@@ -1167,10 +1183,10 @@
         }
       });
       const doorSign = new THREE.Mesh(
-        new THREE.BoxGeometry(4.4, 0.95, 0.55),
-        new THREE.MeshBasicMaterial({ map: doorSignTex })
+        new THREE.BoxGeometry(3.9, 0.65, 0.4),
+        new THREE.MeshBasicMaterial({ map: doorSignTex, toneMapped: false })
       );
-      doorSign.position.set(-1.0, 4.0, 6.0);
+      doorSign.position.set(-1.0, 2.7, 6.0);
       envGroup.add(doorSign);
 
       // Green Planters along the exterior storefront
@@ -1298,64 +1314,7 @@
     const counterMeshes = [];
 
     function create3DGlassesMesh(code) {
-      const g = new THREE.Group();
-      const frameColor = code === 'air2' ? 0xe2e8f0 : code === 'go2' ? 0x94a3b8 : 0x181c24;
-      const frameMat = new THREE.MeshStandardMaterial({
-        color: frameColor,
-        roughness: 0.25,
-        metalness: 0.4,
-        transparent: code === 'go2',
-        opacity: code === 'go2' ? 0.75 : 1.0
-      });
-      const lensMat = new THREE.MeshStandardMaterial({
-        color: 0x7dd3fc,
-        transparent: true,
-        opacity: 0.55,
-        roughness: 0.1,
-        metalness: 0.3
-      });
-      const ledMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-
-      // Front brow bar
-      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.08, 0.08), frameMat);
-      brow.position.set(0, 0.12, 0.22);
-      g.add(brow);
-
-      // Left & Right Lenses
-      const lensGeo = (code === 'go1' || code === 'go3')
-        ? new THREE.CylinderGeometry(0.14, 0.14, 0.04, 16)
-        : new THREE.BoxGeometry(0.28, 0.2, 0.04);
-      const lensL = new THREE.Mesh(lensGeo, lensMat);
-      const lensR = new THREE.Mesh(lensGeo, lensMat);
-      if (code === 'go1' || code === 'go3') {
-        lensL.rotation.x = Math.PI / 2;
-        lensR.rotation.x = Math.PI / 2;
-      }
-      lensL.position.set(-0.19, 0.03, 0.22);
-      lensR.position.set(0.19, 0.03, 0.22);
-      g.add(lensL, lensR);
-
-      // Left & Right Temples (arms)
-      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 0.58), frameMat);
-      armL.position.set(-0.36, 0.09, -0.05);
-      const armR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.08, 0.58), frameMat);
-      armR.position.set(0.36, 0.09, -0.05);
-      g.add(armL, armR);
-
-      // Cyan LED indicators on front temples (or center camera on Air2)
-      if (code === 'air2') {
-        const camDot = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.09), ledMat);
-        camDot.position.set(0, 0.12, 0.24);
-        g.add(camDot);
-      } else {
-        const ledL = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.06, 0.02), ledMat);
-        ledL.position.set(-0.36, 0.09, 0.25);
-        const ledR = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.06, 0.02), ledMat);
-        ledR.position.set(0.36, 0.09, 0.25);
-        g.add(ledL, ledR);
-      }
-
-      return g;
+      return INMOAssets.createGlasses(THREE, code);
     }
 
     function buildCounters() {
@@ -1365,22 +1324,24 @@
 
         // Front Texture with bold Counter Number ("1" .. "6") matching Image 1 & 2
         const frontTex = makeTextTexture({
-          width: 512, height: 256, bg: '#e2e6ec',
+          width: 512, height: 256, bg: '#172d3a',
           drawFn(ctx, w, h) {
             // Subtle vertical split seam
-            ctx.strokeStyle = '#cbd5e1';
+            ctx.strokeStyle = '#2b4b5d';
             ctx.lineWidth = 3;
             ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke();
             // Number on left side
-            ctx.fillStyle = '#1e293b';
+            ctx.fillStyle = '#c5dfeb';
             ctx.font = '800 135px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText(String(item.counterNum), 115, 178);
+            ctx.textAlign='left';ctx.font='600 31px sans-serif';ctx.fillStyle='#8db2c6';
+            ctx.fillText(item.name,260,116);ctx.font='21px sans-serif';ctx.fillText('AR COLLECTION',260,159);
           }
         });
 
-        const sideMat = new THREE.MeshStandardMaterial({ color: 0xdbe0e8, roughness: 0.35 });
-        const topMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.25 });
+        const sideMat = new THREE.MeshStandardMaterial({ color: 0x29414f, roughness: 0.48, metalness: .25 });
+        const topMat = new THREE.MeshStandardMaterial({ color: 0x647c88, roughness: 0.32, metalness: .3, envMapIntensity: .55 });
         const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.35 });
 
         // Pedestal Base Box (3.2 x 1.25 x 1.75)
@@ -1392,6 +1353,10 @@
         baseMesh.castShadow = true;
         baseMesh.receiveShadow = true;
         cg.add(baseMesh);
+        const rim = new THREE.Mesh(new THREE.BoxGeometry(3.24,.035,1.79),new THREE.MeshStandardMaterial({color:0xb0966d,metalness:.65,roughness:.3}));
+        rim.position.y=1.28;cg.add(rim);
+        const foot = new THREE.Mesh(new THREE.BoxGeometry(3.0,.15,1.57),new THREE.MeshStandardMaterial({color:0x101d27,roughness:.55}));
+        foot.position.y=.10;cg.add(foot);
 
         // Glowing Blue Underglow Strip around base (exact match to Image 1 & 2)
         const ledStrip = new THREE.Mesh(
@@ -1403,16 +1368,22 @@
 
         // White Display Riser Pad for the Glasses
         const pad = new THREE.Mesh(
-          new THREE.BoxGeometry(1.25, 0.12, 0.95),
-          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 })
+          new THREE.BoxGeometry(1.95, 0.10, 1.3),
+          new THREE.MeshStandardMaterial({ color: 0x152531, roughness: .87, metalness: .0 })
         );
-        pad.position.set(-0.48, 1.33, 0);
+        pad.position.set(-0.32, 1.35, 0);
+        pad.receiveShadow=true;
         cg.add(pad);
 
         // 3D AR Glasses Model sitting on the Riser Pad
         const glasses3D = create3DGlassesMesh(item.code);
-        glasses3D.position.set(-0.48, 1.48, 0);
+        glasses3D.position.set(-0.32, 1.69, .18);
         cg.add(glasses3D);
+        const spotlight=new THREE.SpotLight(0xffedcf,1.75,13,.48,.72,1.15);
+        spotlight.position.set(item.pos.x-1,6.2,item.pos.z+1.3);spotlight.target.position.set(item.pos.x,1.4,item.pos.z);
+        scene.add(spotlight,spotlight.target);
+        const fixture=new THREE.Mesh(new THREE.CylinderGeometry(.10,.13,.35,12),new THREE.MeshStandardMaterial({color:0x182735,metalness:.6,roughness:.3}));
+        fixture.position.copy(spotlight.position);fixture.rotation.x=.18;scene.add(fixture);
 
         // Small Angled Digital Price Tag Plaque on the right of the counter top (matching Image 2)
         const plaqueTex = makeTextTexture({
@@ -1433,23 +1404,29 @@
           new THREE.BoxGeometry(0.62, 0.52, 0.35),
           new THREE.MeshStandardMaterial({ map: plaqueTex, roughness: 0.3 })
         );
-        plaque.position.set(0.75, 1.48, 0.05);
+        plaque.position.set(1.05, 1.48, 0.05);
         plaque.rotation.x = -0.25;
         cg.add(plaque);
 
         // Glass Vitrine Cover on Top
         const vitrine = new THREE.Mesh(
-          new THREE.BoxGeometry(3.05, 0.72, 1.6),
-          new THREE.MeshStandardMaterial({
-            color: 0xbae6fd,
+          new THREE.BoxGeometry(3.05, .95, 1.6),
+          new THREE.MeshPhysicalMaterial({
+            color: 0xbce5ef,
             transparent: true,
-            opacity: 0.22,
-            roughness: 0.1,
-            metalness: 0.2
+            opacity: .045,
+            depthWrite: false,
+            roughness: .035,
+            metalness: .0,
+            envMapIntensity: .55,
+            clearcoat: 1
           })
         );
-        vitrine.position.y = 1.63;
+        vitrine.position.y = 1.78;
+        vitrine.renderOrder=4;
         cg.add(vitrine);
+        const glassEdges=new THREE.LineSegments(new THREE.EdgesGeometry(vitrine.geometry),new THREE.LineBasicMaterial({color:0x97c9dd,transparent:true,opacity:.24}));
+        glassEdges.position.y=1.78;cg.add(glassEdges);
 
         // Selection / Highlight Ring around counter when targeted
         const highlightRing = new THREE.Mesh(
@@ -1528,27 +1505,20 @@
     ];
 
     // Helper: create a SINGLE smooth 3D vision fan from apex (eyes/lens) down to a curved arc on the floor (no double overlapping light/shadow!)
-    function createVisionFanMesh(apexY, apexZ, floorY, range, fovHalf, colorHex, opacity = 0.28) {
-      const segments = 32;
-      const positions = [];
-      for (let i = 0; i < segments; i++) {
-        const t1 = -fovHalf + (2 * fovHalf * i) / segments;
-        const t2 = -fovHalf + (2 * fovHalf * (i + 1)) / segments;
-        positions.push(0, apexY, apexZ);
-        positions.push(Math.sin(t1) * range, floorY, Math.cos(t1) * range);
-        positions.push(Math.sin(t2) * range, floorY, Math.cos(t2) * range);
+    function createVisionFanMesh(apexY, apexZ, floorY, range, fovHalf, colorHex, opacity = .28) {
+      const group=new THREE.Group(), positions=[], edge=[new THREE.Vector3(0,floorY+.025,0)];
+      for(let i=0;i<40;i++){
+        const a=-fovHalf+2*fovHalf*i/40,b=-fovHalf+2*fovHalf*(i+1)/40;
+        positions.push(0,apexY,apexZ,Math.sin(a)*range,floorY,Math.cos(a)*range,Math.sin(b)*range,floorY,Math.cos(b)*range);
       }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geo.computeVertexNormals();
-      const mat = new THREE.MeshBasicMaterial({
-        color: colorHex,
-        transparent: true,
-        opacity,
-        side: THREE.DoubleSide,
-        depthWrite: false
-      });
-      return new THREE.Mesh(geo, mat);
+      const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+      const volume=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({color:colorHex,transparent:true,opacity:opacity*.20,side:THREE.DoubleSide,depthWrite:false,toneMapped:false}));
+      group.add(volume);
+      const floor=createFloorSectorMesh(range,fovHalf,colorHex,.10);floor.position.y=floorY+.008;group.add(floor);
+      for(let i=0;i<=48;i++){const a=-fovHalf+2*fovHalf*i/48;edge.push(new THREE.Vector3(Math.sin(a)*range,floorY+.025,Math.cos(a)*range));}
+      edge.push(new THREE.Vector3(0,floorY+.025,0));
+      group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(edge),new THREE.LineBasicMaterial({color:colorHex,transparent:true,opacity:.58,toneMapped:false,depthWrite:false})));
+      return group;
     }
 
     function createFloorSectorMesh(range, fovHalf, colorHex, opacity = 0.32) {
@@ -1946,6 +1916,7 @@
     buildSecurityCameras();
     buildClerk();
     buildPlayer();
+    INMOAssets.linearizeScene(scene);
 
     // =========================================================================
     // 5. GAMEPLAY STATE, STEALTH DETECTION, STEALING & MINIMAP
@@ -2265,8 +2236,8 @@
       GLASSES_DATA.forEach(item => { item.stolen = false; });
       counterMeshes.forEach(cm => {
         cm.glasses3D.visible = true;
-        cm.vitrine.position.y = 1.63;
-        cm.vitrine.material.opacity = 0.22;
+        cm.vitrine.position.y = 1.78;
+        cm.vitrine.material.opacity = .045;
         cm.ledStrip.material.color.setHex(0x38bdf8);
       });
 
@@ -2820,8 +2791,8 @@
         counterMeshes.forEach((cm) => {
           // Gentle hover animation on un-stolen 3D glasses
           if (!cm.data.stolen) {
-            cm.glasses3D.position.y = 1.48 + Math.sin(now * 0.003 + cm.data.id) * 0.04;
-            cm.glasses3D.rotation.y = Math.sin(now * 0.0015 + cm.data.id) * 0.25;
+            cm.glasses3D.position.y = 1.69 + Math.sin(now * 0.002 + cm.data.id) * 0.025;
+            cm.glasses3D.rotation.y = -.12 + Math.sin(now * 0.0008 + cm.data.id) * 0.12;
           }
           const d = Math.hypot(player.pos.x - cm.data.pos.x, player.pos.z - cm.data.pos.z);
           if (!cm.data.stolen && d < minDist) {
@@ -2854,7 +2825,7 @@
               document.getElementById('tt-counter-num').textContent = `#${item.counterNum}号柜台`;
               document.getElementById('tt-price').textContent = item.displayPrice;
               document.getElementById('tt-spec').textContent = item.spec;
-              document.getElementById('tt-svg-holder').innerHTML = getGlassesSVG(item.code);
+              document.getElementById('tt-svg-holder').innerHTML = `<img class="product-photo" data-model="${item.code}" src="${INMOAssets.products[item.code].image}" alt="${item.name} 官方展示图">`;
             }
           }
         } else {
@@ -2903,7 +2874,7 @@
       // F. SMOOTH 45-DEGREE ISOMETRIC CAMERA FOLLOW
       // -------------------------------------------------------------------
       const targetFocusX = player.pos.x * (window.innerWidth < 700 ? .72 : .26);
-      const targetFocusZ = (player.pos.z - 1.0) * 0.35 + 0.5;
+      const targetFocusZ = (player.pos.z - 1.0) * 0.16 - .3;
       cameraTarget.x += (targetFocusX - cameraTarget.x) * Math.min(1, dt * 5);
       cameraTarget.z += (targetFocusZ - cameraTarget.z) * Math.min(1, dt * 5);
 
@@ -3016,7 +2987,7 @@
         card.className = 'p-3 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-sky-400/70 transition cursor-pointer flex items-center gap-3';
         card.innerHTML = `
           <div class="w-24 h-16 bg-slate-950 rounded border border-slate-800 flex items-center justify-center flex-shrink-0 p-1">
-            ${getGlassesSVG(item.code)}
+            <img class="product-photo" data-model="${item.code}" src="${INMOAssets.products[item.code].image}" alt="${item.name} 官方展示图" loading="lazy">
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between">

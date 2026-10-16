@@ -18,23 +18,30 @@ html = html.replace('<script src="https://cdn.tailwindcss.com/3.4.17"></script>'
   .replace('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', './vendor/three.min.js')
   .replace(/^\s*<link[^>]+(?:fonts\.googleapis|fonts\.gstatic)[^>]*>\s*$/gm, '');
 await fs.writeFile(path.join(dist, 'index.html'), html);
-for (const file of ['game-rules.js', 'ui-polish.css']) await fs.copyFile(path.join(root, file), path.join(dist, file));
+for (const file of ['game-rules.js', 'ui-polish.css', 'showroom-assets.js']) await fs.copyFile(path.join(root, file), path.join(dist, file));
+await fs.cp(path.join(root,'assets/products'),path.join(dist,'assets/products'),{recursive:true});
 await fs.copyFile(path.join(root, 'node_modules/three/build/three.min.js'), path.join(dist, 'vendor/three.min.js'));
 await fs.copyFile(path.join(root, 'node_modules/three/LICENSE'), path.join(dist, 'vendor/THREE-LICENSE.txt'));
 const release = path.join(root, 'release');
 await fs.mkdir(release, { recursive: true });
-const [uiCss, polishCss, rulesJs, threeJs, threeLicense] = await Promise.all([
+const [uiCss, polishCss, rulesJs, threeJs, threeLicense, showroomJs] = await Promise.all([
   fs.readFile(path.join(dist, 'assets/ui.css'), 'utf8'),
   fs.readFile(path.join(dist, 'ui-polish.css'), 'utf8'),
   fs.readFile(path.join(dist, 'game-rules.js'), 'utf8'),
   fs.readFile(path.join(dist, 'vendor/three.min.js'), 'utf8'),
-  fs.readFile(path.join(dist, 'vendor/THREE-LICENSE.txt'), 'utf8')
+  fs.readFile(path.join(dist, 'vendor/THREE-LICENSE.txt'), 'utf8'),
+  fs.readFile(path.join(dist, 'showroom-assets.js'), 'utf8')
 ]);
 const inlineScript = text => '<script>\n' + text.replace(/<\/script/gi, '<\\/script') + '\n</script>';
-const standalone = html
+let standalone = html
   .replace('<link rel="stylesheet" href="./assets/ui.css">', () => '<style>' + uiCss + '</style>')
   .replace('<link rel="stylesheet" href="./ui-polish.css">', () => '<style>' + polishCss + '</style>')
   .replace('<script src="./game-rules.js"></script>', () => inlineScript(rulesJs))
+  .replace('<script src="./showroom-assets.js"></script>', () => inlineScript(showroomJs))
   .replace('<script src="./vendor/three.min.js"></script>', () => '<!-- ' + threeLicense + ' -->\n' + inlineScript(threeJs));
+for(const code of ['air1','air2','air3','go1','go2','go3']){
+  const data=await fs.readFile(path.join(root,'assets/products',code+'.png'));
+  standalone=standalone.replaceAll('./assets/products/'+code+'.png','data:image/png;base64,'+data.toString('base64'));
+}
 await fs.writeFile(path.join(release, 'inmo_3d_ar_optimized.html'), standalone);
 console.log('Built dist/ and release/inmo_3d_ar_optimized.html — all runtime assets are local.');
