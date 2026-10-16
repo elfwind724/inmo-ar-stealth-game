@@ -1,5 +1,6 @@
 [hidden] { display: none !important; }
 body.chapter-cinematic #touch-dpad { display: none !important; }
+body.police-chapter-active #touch-dpad { bottom: 138px; left: 22px; }
 body.police-chapter-active #mission-panel,
 body.police-chapter-active #top-right-hud,
 body.police-chapter-active #minimap-panel,

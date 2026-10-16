@@ -170,7 +170,8 @@
       box(stationRoot,27,3.6,.32,0,1.7,-8,wall);box(stationRoot,.3,2.8,18,13.2,1.3,1,wall);
       box(stationRoot,.28,.5,18,-13.2,.2,1,base);box(stationRoot,27,.45,.32,0,.17,10,base);
       box(stationRoot,26,.18,.08,0,.65,-7.8,brass);box(stationRoot,26,.65,.10,0,.1,-7.78,base);
-      sign(stationRoot,'CENTRAL  /  警察局',.3,2.7,-7.80,8);
+      sign(stationRoot,'中央警察局',-3.8,2.7,-7.80,4.6);
+      sign(stationRoot,'CENTRAL  /  PRECINCT',7,3,-7.80,5.3);
       sign(stationRoot,'拘留区  01',-8.4,2.35,1.79,4,'#eac77c','#1c303d');
       // Cell is cut open toward the camera; its door actually rotates on the hinge.
       box(stationRoot,8.2,2.9,.25,-9.1,1.35,1.6,wall);obstacle(-9.1,1.6,8.2,.25);
@@ -216,7 +217,8 @@
         box(stationRoot,2.7,.65,.16,x,.95,8.8,material(0x3a6268));
         for(const dx of [-1,1])box(stationRoot,.12,.5,.65,x+dx,.25,8.45,steel);obstacle(x,8.5,2.8,1.1);
       }
-      sign(stationRoot,'接待区  /  RECEPTION',3,1.9,9.77,5).rotation.y=Math.PI;
+      const reception=sign(stationRoot,'接待区  /  RECEPTION',3,.025,9.4,5);
+      reception.rotation.x=-Math.PI/2;
       // Hazard paint, drain and doors give scale without covering the arena.
       for(let z=-6;z<7;z+=1.0)box(stationRoot,.10,.01,.5,-3.6,.005,z,brass);
       box(stationRoot,2.8,3,.15,1,1.4,-7.7,base);sign(stationRoot,'出口 EXIT',1,3.05,-7.57,2.5,'#93dfbd','#163a31');
