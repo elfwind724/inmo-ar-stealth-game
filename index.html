@@ -2000,6 +2000,8 @@
 
     const keys = {};
     const pauseReasons = new Set();
+    let isDraggingCamera = false;
+    let dragStartX = 0;
     let toastTimer;
     let modalReturnFocus = null;
     function showToast(message, duration = 2800) {
@@ -2374,9 +2376,6 @@
       document.getElementById('chase-entry').hidden=true;setPaused('chapter-entry',false);
     });
     if(location.hash==='#chase'){document.getElementById('chase-entry').hidden=false;setPaused('chapter-entry',true);}
-
-    let isDraggingCamera = false;
-    let dragStartX = 0;
 
     renderer.domElement.addEventListener('pointerdown', (e) => {
       if (chapter.active) { SoundFX.init(); chapter.pointer(e,renderer.domElement); return; }
