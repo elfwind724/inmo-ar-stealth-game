@@ -45,6 +45,12 @@ body.first-person:not(.intro-playing) #btn-quick-steal:not(.hidden){display:flex
 #opening-skip{position:absolute;right:22px;bottom:22px;z-index:3;padding:9px 15px;border:1px solid #c7a87565;border-radius:25px;background:#1f1a16ad;color:#cdbfa6;pointer-events:auto;font-size:11px;cursor:pointer;}
 #opening-fade{position:absolute;inset:0;z-index:2;background:#000;opacity:0;}
 body.intro-playing #mission-panel,body.intro-playing #top-right-hud,body.intro-playing #stealth-panel,body.intro-playing #minimap-panel,body.intro-playing #touch-dpad,body.intro-playing #btn-quick-steal,body.intro-playing #counter-tooltip,body.intro-playing #game-toast,body.intro-playing #launch-bubbles,body.intro-playing #venue-names,body.intro-playing #puzzle-pocket,body.intro-playing #puzzle-dialogue{display:none!important;}
+.runner-help{display:none;}
+body.chase-active .runner-help{display:block;}
+body.chase-active .showroom-help,body.chase-active #btn-crouch-toggle,body.chase-active #btn-reset-cam,body.chase-active #btn-replay-opening{display:none!important;}
+body.chase-active .settings-row{grid-template-columns:1fr;}
+body.chase-active #mission-panel,body.chase-active #top-right-hud,body.chase-active #stealth-panel,body.chase-active #minimap-panel,body.chase-active #touch-dpad,body.chase-active #btn-quick-steal,body.chase-active #counter-tooltip,body.chase-active #launch-bubbles,body.chase-active #venue-names,body.chase-active #puzzle-pocket,body.chase-active #puzzle-dialogue,body.chase-active #launch-event-tag{display:none!important;}
+body.showroom-escape #counter-tooltip,body.showroom-escape #btn-quick-steal,body.showroom-escape #puzzle-pocket,body.showroom-escape #stealth-panel,body.showroom-escape #btn-camera-mode{display:none!important;}
 @media(any-pointer:coarse){
  #touch-dpad{display:grid;}
  #minimap-panel{bottom:126px;}

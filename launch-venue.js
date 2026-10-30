@@ -7,6 +7,7 @@
     let elapsed=0,nextBubble=2.5,bubbleIndex=0,lastCheer=-1;
     let nextEmcee=1,nextLyric=15,nextStream=17,emceeLine=0,lyricLine=0,streamLine=0,storyCycle=-1,storyCue=-1;
     let overlayWidth=0,overlayHeight=0,nextOverlayMeasure=0,overlayObstacles=[];
+    const pursuit={active:false,getTarget:null,findPath:null,route:[],routeIndex:0,nextPlan:0,nextShout:0};
     const stations={drink:{x:-4.7,z:3.3,name:'饮料台'},waiter:{x:-4.6,z:1.2,name:'服务员'},show:{x:10.4,z:5.0,name:'现场调音台'}};
     const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
     const geometry={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(.5,12,8),cylinder:new T.CylinderGeometry(.5,.5,1,12)};
@@ -298,7 +299,7 @@
       '这里没有普通观众，都是未来体验官。','先别问多少钱，先让我多看两眼。','签到了，但还没签到前排。','请给后排朋友一点点未来视野。'
     ];
     function setDialogueFocus(actor,active,target){
-      if(!actor)return;
+      if(!actor||(actor===emcee&&pursuit.active&&active))return;
       actor.dialogueFocus=active?{target}:null;
       if(active){
         actor.speakingUntil=0;
@@ -307,7 +308,7 @@
       }
     }
     function bubble(p,text,duration=2.8,priority=0){
-      const container=document.getElementById('launch-bubbles');if(!container||!camera||p.dialogueFocus)return;
+      const container=document.getElementById('launch-bubbles');if(!container||!camera||p.dialogueFocus||(p===emcee&&pursuit.active&&priority<4))return;
       // A speaker has one readable line at a time, including during a cue change.
       for(let i=bubbles.length-1;i>=0;i--)if(bubbles[i].person===p){bubbles[i].node.remove();bubbles.splice(i,1);}
       if(bubbles.length>=3){
@@ -320,7 +321,60 @@
       const line=document.createElement('span');line.textContent=text;node.appendChild(line);container.appendChild(node);
       node.dataset.priority=String(priority);bubbles.push({person:p,node,life:duration,priority});
     }
-    function say(p,text,duration=3.1,priority=1){if(p.dialogueFocus)return;p.speakingUntil=elapsed+duration;bubble(p,text,duration,priority);}
+    function say(p,text,duration=3.1,priority=1){if(p.dialogueFocus||(p===emcee&&pursuit.active&&priority<4))return;p.speakingUntil=elapsed+duration;bubble(p,text,duration,priority);}
+    function startPursuit({getTarget,findPath}={}){
+      if(typeof getTarget!=='function'||typeof findPath!=='function')return false;
+      if(pursuit.active)return true;
+      Object.assign(pursuit,{active:true,getTarget,findPath,route:[],routeIndex:0,nextPlan:elapsed,nextShout:elapsed+3.5});
+      emcee.pos.x=emcee.group.position.x;emcee.pos.z=emcee.group.position.z;
+      emcee.dialogueFocus=null;emcee.mode='PURSUIT';emcee.observing=false;emcee.phone.visible=false;
+      for(let i=bubbles.length-1;i>=0;i--)if(bubbles[i].person===emcee){bubbles[i].node.remove();bubbles.splice(i,1);}
+      say(emcee,'抓小偷呀！',3,4);return true;
+    }
+    function stopPursuit(){
+      Object.assign(pursuit,{active:false,getTarget:null,findPath:null,route:[],routeIndex:0,nextPlan:0,nextShout:0});
+      for(let i=bubbles.length-1;i>=0;i--)if(bubbles[i].person===emcee&&bubbles[i].priority>=4){bubbles[i].node.remove();bubbles.splice(i,1);}
+      emcee.pos.x=emcee.home.x;emcee.pos.z=emcee.home.z;emcee.angle=Math.PI;emcee.mode='WATCH';emcee.dialogueFocus=null;emcee.speakingUntil=0;
+      emcee.group.position.set(emcee.home.x,emcee.baseY,emcee.home.z);emcee.shadow.position.set(emcee.home.x,.029,emcee.home.z);
+      emcee.body.position.set(0,0,0);emcee.body.rotation.set(0,Math.atan2(-emcee.home.x,1.5-emcee.home.z),0);emcee.head.rotation.set(0,0,0);
+      for(const leg of [emcee.legL,emcee.legR]){leg.hip.rotation.set(0,0,0);leg.knee.rotation.set(0,0,0);}
+      emcee.armR.shoulder.rotation.set(-1.35,0,-.14);emcee.armR.elbow.rotation.set(-1.08,0,0);
+      emcee.armL.shoulder.rotation.set(-.65,0,.25);emcee.armL.elbow.rotation.set(-.3,0,-.1);
+    }
+    function updatePursuit(dt){
+      if(!pursuit.active)return;
+      let target;try{target=pursuit.getTarget();}catch{target=null;}
+      if(elapsed>=pursuit.nextShout){say(emcee,'抓小偷呀！',3,4);pursuit.nextShout=elapsed+3.5;}
+      const previousX=emcee.pos.x,previousZ=emcee.pos.z;
+      const validTarget=target&&Number.isFinite(target.x)&&Number.isFinite(target.z);
+      if(validTarget&&elapsed>=pursuit.nextPlan){
+        let route;try{route=pursuit.findPath({x:emcee.pos.x,z:emcee.pos.z},{x:target.x,z:target.z});}catch{route=null;}
+        pursuit.route=Array.isArray(route)&&route.every(point=>point&&Number.isFinite(point.x)&&Number.isFinite(point.z))?route.map(point=>({x:point.x,z:point.z})):[];
+        pursuit.routeIndex=0;pursuit.nextPlan=elapsed+.5;
+      }
+      // Only consume points returned by the shared navigator. A failed path leaves
+      // her in place until the next plan, without a straight-line fallback.
+      let budget=validTarget?5.8*Math.max(0,dt):0;
+      while(budget>0&&pursuit.routeIndex<pursuit.route.length){
+        const gap=Math.hypot(target.x-emcee.pos.x,target.z-emcee.pos.z)-1.2;if(gap<=.01)break;
+        const point=pursuit.route[pursuit.routeIndex],dx=point.x-emcee.pos.x,dz=point.z-emcee.pos.z,length=Math.hypot(dx,dz);
+        if(length<.02){pursuit.routeIndex++;continue;}
+        const step=Math.min(length,budget,gap);emcee.pos.x+=dx/length*step;emcee.pos.z+=dz/length*step;budget-=step;
+        if(step>=length-.001)pursuit.routeIndex++;
+      }
+      const moved=Math.hypot(emcee.pos.x-previousX,emcee.pos.z-previousZ)>.001;
+      const desired=moved?Math.atan2(emcee.pos.x-previousX,emcee.pos.z-previousZ):validTarget?Math.atan2(target.x-emcee.pos.x,target.z-emcee.pos.z):emcee.angle;
+      emcee.angle+=Math.atan2(Math.sin(desired-emcee.angle),Math.cos(desired-emcee.angle))*Math.min(1,dt*14);
+      const stride=moved?Math.sin(elapsed*13):0,lift=moved?Math.abs(Math.sin(elapsed*13))*.075:0;
+      emcee.mode='PURSUIT';emcee.observing=false;emcee.phone.visible=false;
+      emcee.group.position.set(emcee.pos.x,emcee.baseY,emcee.pos.z);emcee.body.position.set(0,lift,0);emcee.body.rotation.set(moved?-.12:0,emcee.angle,moved?stride*.025:0);
+      emcee.head.rotation.set(moved?.06:0,0,0);
+      emcee.legL.hip.rotation.set(stride*.8,0,0);emcee.legR.hip.rotation.set(-stride*.8,0,0);
+      emcee.legL.knee.rotation.set(Math.max(0,-stride)*1.05,0,0);emcee.legR.knee.rotation.set(Math.max(0,stride)*1.05,0,0);
+      emcee.armL.shoulder.rotation.set(-.45-stride*.75,0,.18);emcee.armL.elbow.rotation.set(-.85,0,0);
+      emcee.armR.shoulder.rotation.set(-1.05+stride*.3,0,-.15);emcee.armR.elbow.rotation.set(-.9,0,0);
+      emcee.shadow.position.set(emcee.pos.x,.029,emcee.pos.z);
+    }
     function updateNameplates(){
       const container=document.getElementById('venue-names'),visible=[];if(!container||!camera)return visible;
       for(const entry of namedActors){
@@ -418,15 +472,17 @@
       }
       // These are separate performance lines, not puzzle clues or product claims.
       const dialogueWindow=phase<3||phase>16;
-      if(dialogueWindow&&elapsed>=nextEmcee){say(emcee,emceeLines[emceeLine++%emceeLines.length],3.5,1);nextEmcee=elapsed+8.7;}
+      if(!pursuit.active&&dialogueWindow&&elapsed>=nextEmcee){say(emcee,emceeLines[emceeLine++%emceeLines.length],3.5,1);nextEmcee=elapsed+8.7;}
       if(dialogueWindow&&elapsed>=nextLyric){say(mo,'♪ '+lyricLines[lyricLine++%lyricLines.length],3.5,1);nextLyric=elapsed+10.3;}
       if(dialogueWindow&&elapsed>=nextStream){say(streamer,streamLines[streamLine++%streamLines.length],3.5,1);nextStream=elapsed+11.4;}
-      emcee.group.position.set(emcee.home.x,emcee.baseY,emcee.home.z);emcee.observing=false;emcee.phone.visible=false;
-      emcee.body.rotation.y=Math.atan2(-emcee.home.x,1.5-emcee.home.z)+Math.sin(elapsed*.7)*.04;
-      emcee.armR.shoulder.rotation.set(-1.35,0,-.14);emcee.armR.elbow.rotation.set(-1.08,0,0);
-      emcee.armL.shoulder.rotation.set(-.65-Math.sin(elapsed*1.7)*.45,0,.25+Math.sin(elapsed*.65)*.16);
-      emcee.armL.elbow.rotation.set(-.30,0,-.1);emcee.body.position.y=Math.sin(elapsed*2.1)*.025;
-      emcee.head.rotation.set(.03,Math.sin(elapsed*.65)*.12,0);
+      if(!pursuit.active){
+        emcee.group.position.set(emcee.home.x,emcee.baseY,emcee.home.z);emcee.observing=false;emcee.phone.visible=false;
+        emcee.body.rotation.y=Math.atan2(-emcee.home.x,1.5-emcee.home.z)+Math.sin(elapsed*.7)*.04;
+        emcee.armR.shoulder.rotation.set(-1.35,0,-.14);emcee.armR.elbow.rotation.set(-1.08,0,0);
+        emcee.armL.shoulder.rotation.set(-.65-Math.sin(elapsed*1.7)*.45,0,.25+Math.sin(elapsed*.65)*.16);
+        emcee.armL.elbow.rotation.set(-.30,0,-.1);emcee.body.position.y=Math.sin(elapsed*2.1)*.025;
+        emcee.head.rotation.set(.03,Math.sin(elapsed*.65)*.12,0);
+      }
       streamer.observing=false;streamer.phone.visible=false;
       streamer.body.rotation.y=-.65+Math.sin(elapsed*.45)*.18;
       streamer.armR.shoulder.rotation.set(-1.12,0,-.15);streamer.armR.elbow.rotation.set(-.67,0,0);
@@ -454,6 +510,7 @@
       const step=Math.min(length,speed*dt);p.pos.x+=dx/(length||1)*step;p.pos.z+=dz/(length||1)*step;return true;
     }
     function reset(){
+      stopPursuit();
       elapsed=0;nextBubble=2.5;bubbleIndex=0;lastCheer=-1;
       nextEmcee=1;nextLyric=16.5;nextStream=18;emceeLine=0;lyricLine=0;streamLine=0;storyCycle=-1;storyCue=-1;
       nextOverlayMeasure=0;
@@ -470,6 +527,7 @@
       const cheerCycle=Math.floor(elapsed/18);
       if(show&&lastCheer!==cheerCycle){lastCheer=cheerCycle;cheer();}
       for(const p of people){
+        if(p===emcee&&pursuit.active)continue;
         const t=elapsed+p.phase,attentionCycle=t%p.attentionPeriod;let walking=false;
         const isPhone=p.role!=='dancer'&&attentionCycle>p.attentionPeriod-(p.role==='security'?3.2:2.8);
         const previousX=p.pos.x,previousZ=p.pos.z;
@@ -511,7 +569,7 @@
         p.legL.hip.rotation.x=wave*.3;p.legR.hip.rotation.x=-wave*.3;p.legL.knee.rotation.x=lift*.3;p.legR.knee.rotation.x=Math.max(0,-Math.sin(t*2))*.3;
         p.head.rotation.set(.02,Math.sin(t*.6)*.16,0);p.phone.visible=false;p.observing=false;
       }
-      updatePerformance();
+      updatePerformance();updatePursuit(dt);
       if(elapsed>=nextBubble){
         nextBubble=elapsed+3.7;
         const candidates=people.filter(p=>!p.hasNameplate&&p.role!=='dancer'&&p.role!=='security'&&p.role!=='stage-security');
@@ -529,7 +587,7 @@
       }return null;
     }
     reset();
-    return {group,people,stations,namedActors,update,reset,witness,setDialogueFocus,alertCount:()=>people.filter(p=>p.observing).length};
+    return {group,people,stations,namedActors,update,reset,witness,setDialogueFocus,startPursuit,stopPursuit,get isPursuing(){return pursuit.active;},alertCount:()=>people.filter(p=>p.observing).length};
   }
   root.LaunchVenue={build};
 })(typeof window!=='undefined'?window:globalThis);

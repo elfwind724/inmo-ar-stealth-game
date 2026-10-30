@@ -217,7 +217,7 @@
       update(0);
     }
     reset();
-    return {state,group,targets,keyPoint,keyApproach,update,reset,interact,nearbyHint};
+    return {state,group,targets,keyPoint,keyApproach,update,reset,interact,nearbyHint,cancelDialogue:finishConversation};
   }
   root.LaunchPuzzle={create};
 })(typeof window!=='undefined'?window:globalThis);

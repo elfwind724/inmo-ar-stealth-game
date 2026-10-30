@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>INMO 进入空间时代 · 新品发布会潜入</title>
+  <title>INMO 进入空间时代 · 潜入与追逐</title>
   <meta name="theme-color" content="#101d2c">
-  <meta name="description" content="进入金橙色的INMO新品发布会，在广场演出、人群与巡场安保之间寻找机会，拿到神秘新品样机。">
+  <meta name="description" content="在INMO新品发布会寻找钥匙、躲开视线取得样机，再连续点击加速，在小影的飞踢追赶中坚持三分钟。">
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -220,7 +220,9 @@
   <script src="./launch-venue.js"></script>
   <script src="./launch-puzzle.js"></script>
   <script src="./launch-intro.js"></script>
+  <script src="./chase-runner.js"></script>
   <link rel="stylesheet" href="./launch-event.css">
+  <link rel="stylesheet" href="./chase-runner.css">
 </head>
 <body>
   <!-- 3D WebGL Viewport -->
@@ -382,6 +384,7 @@
           <span class="text-slate-400">行动耗时:</span>
           <span id="end-time" class="text-slate-200">00:00</span>
         </div>
+        <div id="end-chase-stat" class="hidden flex justify-between"><span class="text-slate-400">追逐剩余血量:</span><span id="end-health" class="text-emerald-300">100%</span></div>
         <div class="flex justify-between">
           <span class="text-slate-400">潜行与速度奖励:</span>
           <span id="end-bonus" class="text-amber-300">+0</span>
@@ -405,6 +408,7 @@
         <button id="btn-play-again" class="hud-btn flex-1 py-2.5 text-sm mono-font font-bold bg-sky-600/30 border-sky-400 text-white">
           重来
         </button>
+        <button id="btn-return-showroom" class="hud-btn hidden px-3 py-2.5 text-sm mono-font">重返发布会</button>
         <button id="btn-end-leaderboard" class="hud-btn px-4 py-2.5 text-sm mono-font">
           📊 排行榜
         </button>
@@ -430,10 +434,11 @@
     <div class="dialog-card">
       <div class="dialog-kicker">INMO / STEALTH OPERATION</div>
       <h2 id="pause-title">行动已暂停</h2>
-      <p>目标是店内主舞台的神秘新品样机。正常走动和交谈安全；开柜或取镜时被持续注意才会失败，移动可取消动作。</p>
-      <div class="controls-grid"><div>移动 <kbd>WASD / ↑↓←→</kbd></div><div>取走样机 <kbd>E / 空格</kbd></div><div>慢走蹲姿 <kbd>Shift / C</kbd></div><div>暂停 / 继续 <kbd>Esc / P</kbd></div><div>切换 / 重置视角 <kbd>F / V</kbd></div><div>重新开始 <kbd>R</kbd></div></div>
-      <p>靠近可交谈的人或可查看的物件，按 E 互动。展柜需要钥匙；开柜后再按 E 取镜。被注意时可以移动取消动作，鼠标滚轮不缩放。</p>
-      <p>俯视模式按屏幕方向移动；第一人称按面朝方向移动，右键拖动看四周。触屏保留左侧方向键，右半屏拖动观察，轻点人物或近处地面走近。</p>
+      <p class="showroom-help">目标是店内主舞台的神秘新品样机。正常走动和交谈安全；开柜或取镜时被持续注意才会失败，移动可取消动作。</p>
+      <div class="controls-grid showroom-help"><div>移动 <kbd>WASD / ↑↓←→</kbd></div><div>取走样机 <kbd>E / 空格</kbd></div><div>慢走蹲姿 <kbd>Shift / C</kbd></div><div>暂停 / 继续 <kbd>Esc / P</kbd></div><div>切换 / 重置视角 <kbd>F / V</kbd></div><div>重新开始 <kbd>R</kbd></div></div>
+      <p class="showroom-help">靠近可交谈的人或可查看的物件，按 E 互动。展柜需要钥匙；开柜后再按 E 取镜。被注意时可以移动取消动作，鼠标滚轮不缩放。</p>
+      <p class="showroom-help">俯视模式按屏幕方向移动；第一人称按面朝方向移动，右键拖动看四周。触屏保留左侧方向键，右半屏拖动观察，轻点人物或近处地面走近。</p>
+      <div class="runner-help"><p>连续点击画面或用手指点屏幕加速，也可反复按空格。长按不会连续加速。</p><p>小影以 80 码追赶。低于 80 码时她会追近并飞踢，每次损失 15% 血量。保持奔跑，坚持 3 分钟过关。</p><p>P / Esc 暂停，R 重试本关。暂停或切到后台时不计时、不扣血。</p></div>
       <div class="settings-row"><button id="btn-crouch-toggle" class="hud-btn"><span id="crouch-btn-label">站立行走</span></button><button id="btn-reset-cam" class="hud-btn">重置视角</button><button id="btn-audio-toggle" class="hud-btn"><span id="audio-btn-label">音效开启</span></button></div>
       <div class="dialog-actions"><button id="btn-resume" class="primary-action">继续行动</button><button id="btn-replay-opening" class="hud-btn">重看开场</button><button id="btn-restart-quick" class="hud-btn">重新开始</button></div>
     </div>
@@ -1387,6 +1392,7 @@
     // =========================================================================
     const gameState = {
       status: 'PLAYING', // 'PLAYING' | 'GAMEOVER' | 'VICTORY'
+      chapter:'SHOWROOM', showroomTime:0, showroomExposure:0, chapterOneTime:0, chaseBaseScore:0, chaseHealth:100,
       score: 0,
       stolenCount: 0,
       elapsedTime: 0,
@@ -1399,6 +1405,8 @@
       runId: Date.now().toString(36),
       resultBonus: 0, stealDuration:1.5
     };
+    let chaseRunner=null;
+    const escapeFlow={elapsed:0,routed:false};
 
     const keys = {};
     const pauseReasons = new Set();
@@ -1426,10 +1434,13 @@
     function manualPause(paused) {
       if(opening.active){clearInput();opening.pause(paused);return;}
       if (gameState.status !== 'PLAYING') return;
+      document.getElementById('pause-title').textContent=gameState.chapter==='CHASING'?'追逐已暂停':'行动已暂停';
+      document.getElementById('btn-resume').textContent=gameState.chapter==='CHASING'?'继续追逐':'继续行动';
       if (paused) modalReturnFocus = document.activeElement;
       setPaused('manual', paused);
       document.getElementById('modal-pause').classList.toggle('hidden', !paused);
       if (paused) document.getElementById('btn-resume').focus();
+      else if(gameState.chapter==='CHASING')document.getElementById('chase-tap-pad')?.focus({preventScroll:true});
       else modalReturnFocus?.focus();
     }
     function openGameModal(id) {
@@ -1472,6 +1483,12 @@
         if([' ','enter','escape','p'].includes(k))e.preventDefault();
         return;
       }
+      if(gameState.chapter==='CHASING'&&!['escape','p'].includes(k)){
+        if(!e.repeat&&k==='r'){e.preventDefault();restartCurrentChapter();return;}
+        if(isPaused()||gameState.status!=='PLAYING')return;
+        if(!e.repeat&&k==='m')toggleAudio();
+        return;
+      }
       if (['arrowup','arrowdown','arrowleft','arrowright',' ','e','p','escape'].includes(k)) e.preventDefault();
       if (k === 'escape' || k === 'p') {
         if (e.repeat) return;
@@ -1488,7 +1505,7 @@
       if (k === 'v') resetCameraView();
       if (k === 'f') toggleCameraMode();
       if (k === 'm') toggleAudio();
-      if (k === 'r') restartGame();
+      if (k === 'r') restartCurrentChapter();
     });
     window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
     window.addEventListener('blur', () => {
@@ -1545,7 +1562,7 @@
       camera.updateMatrixWorld(true);
     }
     function toggleCameraMode(){
-      if(opening.active)return;
+      if(opening.active||gameState.chapter!=='SHOWROOM')return;
       clearInput();player.path=[];player.targetDest=null;clickMarker.material.opacity=0;cancelSteal(false);
       cameraMode=cameraMode==='overhead'?'first-person':'overhead';
       const firstPerson=cameraMode==='first-person';
@@ -1611,6 +1628,7 @@
     }
 
     function highlightAndNavigateToCounter(item) {
+      if(gameState.chapter!=='SHOWROOM')return;
       const candidates = [{x:item.pos.x,z:item.pos.z+1.75},{x:item.pos.x,z:item.pos.z-1.75},{x:item.pos.x-2.35,z:item.pos.z},{x:item.pos.x+2.35,z:item.pos.z}];
       let best = null, shortest = Infinity;
       for (const candidate of candidates) {
@@ -1626,11 +1644,13 @@
     }
 
     function interactNearby(){
+      if(gameState.chapter!=='SHOWROOM')return;
       if(gameState.status!=='PLAYING'||isPaused())return;
       if(!gameState.stealingTarget&&puzzle.interact())return;
       tryStartStealing();
     }
     function tryStartStealing(specificCounter) {
+      if(gameState.chapter!=='SHOWROOM')return;
       if(gameState.status!=='PLAYING'||isPaused()||gameState.stealingTarget)return;
       const target=specificCounter||gameState.nearestCounter;
       if(!target||target.data.stolen)return;
@@ -1669,10 +1689,57 @@
       document.getElementById('score-val').textContent = gameState.score;
       renderMissionListUI();
 
-      // Check Victory Condition: All 6 AR Glasses Stolen!
+      // Taking the sample starts the escape; the chase decides the final result.
       if (gameState.stolenCount >= GLASSES_DATA.length) {
-        triggerVictory();
+        beginShowroomEscape();
       }
+    }
+
+    function beginShowroomEscape(){
+      if(gameState.chapter!=='SHOWROOM'||gameState.status!=='PLAYING')return;
+      gameState.showroomTime=gameState.elapsedTime;gameState.showroomExposure=gameState.exposure;
+      clearInput();cancelSteal(false);toggleCrouch(false);puzzle.cancelDialogue();puzzle.group.visible=false;
+      if(cameraMode==='first-person')toggleCameraMode();
+      gameState.chapter='SHOWROOM_ESCAPE';gameState.exposure=0;gameState.nearestCounter=null;
+      escapeFlow.elapsed=0;escapeFlow.routed=false;player.path=[];player.targetDest=null;
+      currentTooltipCounterId=null;clickMarker.material.opacity=0;
+      document.body.classList.add('showroom-escape');
+      document.getElementById('danger-overlay').classList.add('hidden');
+      document.getElementById('counter-tooltip').classList.add('hidden');
+      document.getElementById('btn-quick-steal').classList.add('hidden');
+      document.querySelector('.mission-title h1').textContent='快跑出展厅！';
+      document.getElementById('launch-event-tag').textContent='样机到手 · 小影追来了';
+      launchVenue.startPursuit({getTarget:()=>player.pos,findPath:(from,to)=>routePlanner.findPath(from,to)});
+      showToast('小影：抓小偷呀！快从入口跑出去！',4000);
+    }
+    function updateShowroomEscape(dt){
+      escapeFlow.elapsed+=dt;
+      if(!escapeFlow.routed&&escapeFlow.elapsed>=.85){
+        escapeFlow.routed=true;
+        navigateTo({x:-1,z:8.8},'展厅出口');
+      }
+      if(player.pos.z>7.7)beginRunnerChapter();
+    }
+    function beginRunnerChapter(retry=false){
+      if(!chaseRunner)return;
+      clearInput();cancelSteal(false);launchVenue.stopPursuit();
+      player.path=[];player.targetDest=null;clickMarker.material.opacity=0;
+      if(!retry){gameState.chapterOneTime=gameState.elapsedTime;gameState.chaseBaseScore=gameState.score;}
+      gameState.chapter='CHASING';gameState.status='PLAYING';gameState.chaseHealth=100;
+      gameState.score=gameState.chaseBaseScore;gameState.resultBonus=0;gameState.scoreSavedThisRun=false;
+      gameState.elapsedTime=gameState.chapterOneTime;
+      gameState.runId=Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+      pauseReasons.clear();document.body.classList.remove('showroom-escape');document.body.classList.add('chase-active');
+      for(const id of ['modal-pause','modal-endgame','modal-catalog','modal-leaderboard','danger-overlay','pause-state']){
+        document.getElementById(id).classList.add('hidden');document.getElementById(id).classList.remove('flex');
+      }
+      document.getElementById('btn-restart-quick').textContent='重试追逐';
+      document.getElementById('score-val').textContent=String(gameState.score);
+      chaseRunner.start();
+    }
+    function restartCurrentChapter(){
+      if(gameState.chapter==='CHASING')beginRunnerChapter(true);
+      else restartGame();
     }
 
     function triggerGameOver(reasonText) {
@@ -1685,22 +1752,23 @@
       showEndgameModal(false, reasonText);
     }
 
-    function triggerVictory() {
-      if (gameState.status !== 'PLAYING') return;
+    function triggerVictory(result) {
+      if (gameState.status !== 'PLAYING'||gameState.chapter!=='CHASING') return;
       gameState.status = 'VICTORY';document.getElementById('launch-bubbles').style.opacity='0';
       gameState.stealingTarget = null;
       player.targetDest = null;
       SoundFX.victoryFanfare();
 
-      // Calculate speed & stealth bonus
-      const timeBonus = Math.max(150, Math.round(900 - gameState.elapsedTime * 6));
-      const stealthBonus = Math.round((100 - gameState.exposure) * 3);
-      const totalBonus = timeBonus + stealthBonus;
+      gameState.chaseHealth=Math.max(0,Math.round(result.health));
+      gameState.elapsedTime=gameState.chapterOneTime+180;
+      const timeBonus = Math.max(150, Math.round(900 - gameState.showroomTime * 6));
+      const stealthBonus = Math.round((100 - gameState.showroomExposure) * 3);
+      const totalBonus = timeBonus + stealthBonus+3000+gameState.chaseHealth*12;
       gameState.resultBonus = totalBonus;
       gameState.score += totalBonus;
       document.getElementById('score-val').textContent = gameState.score;
 
-      showEndgameModal(true, '你趁发布会的热闹拿到了神秘新品样机。行动成功！', totalBonus);
+      showEndgameModal(true, '坚持三分钟，终于甩掉了小影！样机到手，双关逃脱成功。', totalBonus);
     }
 
     function formatTime(sec) {
@@ -1718,12 +1786,12 @@
       if (isWin) {
         badge.textContent = '🏆';
         badge.className = 'inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-3xl mb-3';
-        title.textContent = '样机到手 · 行动成功';
+        title.textContent = '三分钟极限 · 甩掉小影！';
         title.className = 'mono-font text-2xl font-extrabold tracking-wide text-emerald-400';
       } else {
         badge.textContent = '🚨';
         badge.className = 'inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-500/20 border border-red-400/50 text-3xl mb-3';
-        title.textContent = '被发现了 · 行动结束';
+        title.textContent = gameState.chapter==='CHASING'?'小影飞踢 · 追逐失败':'被发现了 · 行动结束';
         title.className = 'mono-font text-2xl font-extrabold tracking-wide text-red-400';
       }
 
@@ -1734,6 +1802,10 @@
       document.getElementById('end-time').textContent = formatTime(gameState.elapsedTime);
       document.getElementById('end-bonus').textContent = `+${bonus}`;
       document.getElementById('end-final-score').textContent = String(gameState.score);
+      const chaseResult=gameState.chapter==='CHASING';
+      document.getElementById('end-chase-stat').classList.toggle('hidden',!chaseResult);
+      document.getElementById('end-health').textContent=gameState.chaseHealth+'%';
+      document.getElementById('btn-return-showroom').classList.toggle('hidden',!chaseResult);
 
       const saveBtn = document.getElementById('btn-save-score');
       saveBtn.textContent = isWin ? '更新代号' : '计入排行榜';
@@ -1741,7 +1813,7 @@
       document.getElementById('endgame-save-box').classList.toggle('hidden', !isWin);
       
       document.getElementById('btn-end-leaderboard').classList.toggle('hidden', !isWin);
-      document.getElementById('btn-play-again').textContent = isWin ? '再来一局' : '重新来';
+      document.getElementById('btn-play-again').textContent = chaseResult?'重试追逐':isWin ? '再来一局' : '重新来';
       if (isWin) saveCurrentRun(false);
 
       modal.classList.remove('hidden');
@@ -1750,6 +1822,13 @@
     }
 
     function restartGame() {
+      chaseRunner?.stop();gameState.chapter='SHOWROOM';gameState.showroomTime=0;gameState.chapterOneTime=0;
+      gameState.showroomExposure=0;gameState.chaseBaseScore=0;gameState.chaseHealth=100;
+      escapeFlow.elapsed=0;escapeFlow.routed=false;
+      document.body.classList.remove('chase-active','showroom-escape');puzzle.group.visible=true;
+      document.querySelector('.mission-title h1').textContent='新品发布会';
+      document.getElementById('launch-event-tag').textContent='11.04 · 影目新品发布会';
+      document.getElementById('btn-restart-quick').textContent='重新开始';
       launchVenue.reset(); puzzle.reset();gameState.cabinetUnlocked=false;gameState.actionKind='unlock';document.getElementById('launch-bubbles').style.opacity='1';
       gameState.status = 'PLAYING'; pauseReasons.clear(); clearInput();
       camYawOffset=0; cameraTarget.set(0,.5,1.5);
@@ -1812,14 +1891,19 @@
     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
     const puzzle=LaunchPuzzle.create({THREE,scene,player,venue:launchVenue,camera,toast:showToast,sound:SoundFX,
-      canAct:()=>gameState.status==='PLAYING'&&!isPaused()});
+      canAct:()=>gameState.status==='PLAYING'&&gameState.chapter==='SHOWROOM'&&!isPaused()});
     const opening=LaunchIntro.create({THREE,renderer,player,onDone:()=>{
       clearInput();showToast('靠近头顶问号的人按 E 交谈；点击人物或物件可走近。',5000);
     }});
     const venueMusic=VenueMusic.create({audio:document.getElementById('venue-music'),button:document.getElementById('btn-music-toggle'),
       canPlay:()=>!opening.active&&gameState.status==='PLAYING'});
+    chaseRunner=ChaseRunner.create({THREE,renderer,player,emcee:launchVenue.people.find(p=>p.name==='inmo小影'),sound:SoundFX,
+      onPause:()=>manualPause(true),onMusic:()=>document.getElementById('btn-music-toggle').click(),
+      onWin:result=>triggerVictory(result),
+      onLose:result=>{gameState.chaseHealth=0;gameState.elapsedTime=gameState.chapterOneTime+result.elapsed;triggerGameOver('血量耗尽，被小影追上了。连续点击加速，尽量保持在 80 码以上！');}});
 
     function pickWorld(clientX,clientY){
+      if(gameState.chapter!=='SHOWROOM')return;
       if(opening.active||gameState.status!=='PLAYING'||isPaused())return;
       updateGameCamera(0);scene.updateMatrixWorld(true);
       const rect = renderer.domElement.getBoundingClientRect();
@@ -1872,6 +1956,7 @@
       }
     }
     renderer.domElement.addEventListener('pointerdown',e=>{
+      if(gameState.chapter!=='SHOWROOM')return;
       if(opening.active||gameState.status!=='PLAYING'||isPaused())return;
       if(e.pointerType==='mouse'&&![0,1,2].includes(e.button))return;
       SoundFX.init();e.preventDefault();
@@ -2030,6 +2115,18 @@
         opening.update(dt);
         if(opening.active){renderer.render(opening.scene,opening.camera);return;}
       }
+      if(chaseRunner?.active){
+        chaseRunner.update(dt,isPaused()||gameState.status!=='PLAYING');
+        if(gameState.status==='PLAYING')gameState.elapsedTime=gameState.chapterOneTime+chaseRunner.state.elapsed;
+        const musicSource=document.getElementById('btn-music-toggle'),musicTarget=document.getElementById('chase-music-toggle');
+        if(musicTarget){
+          if(musicTarget.textContent!==musicSource.textContent)musicTarget.textContent=musicSource.textContent;
+          musicTarget.setAttribute('aria-label',musicSource.getAttribute('aria-label'));
+          musicTarget.setAttribute('aria-pressed',musicSource.getAttribute('aria-pressed'));
+        }
+        chaseRunner.render();
+        return;
+      }
       let cameraUpdated=false;
       if (gameState.status === 'PLAYING' && !isPaused()) {
         gameState.elapsedTime += dt;
@@ -2044,6 +2141,7 @@
         if (keys['s'] || keys['arrowdown']) moveZ += 1;
         if (keys['a'] || keys['arrowleft']) moveX -= 1;
         if (keys['d'] || keys['arrowright']) moveX += 1;
+        if(gameState.chapter==='SHOWROOM_ESCAPE'&&escapeFlow.elapsed<.85){moveX=0;moveZ=0;}
 
         if (moveX !== 0 || moveZ !== 0) {
           player.targetDest = null; player.path = []; clickMarker.material.opacity = 0;
@@ -2172,6 +2270,11 @@
         const caughtByClerk=Boolean(crowdWitness);
         clerkBubbleEl.classList.add('hidden');
         puzzle.update(dt);
+        if(gameState.chapter==='SHOWROOM_ESCAPE'){
+          updateShowroomEscape(dt);
+          if(chaseRunner.active)chaseRunner.render();else renderer.render(scene,camera);
+          return;
+        }
         document.getElementById('puzzle-key-status').textContent=puzzle.state.hasKey?'展柜钥匙 ✓':'没有钥匙';
 
         // D. PROXIMITY TO COUNTERS & STEALING PROGRESS
@@ -2297,14 +2400,15 @@
     
     function bindDpad(btnId,keyName) {
       const el=document.getElementById(btnId);
-      el.addEventListener('pointerdown',e=>{e.preventDefault(); if(isPaused()||gameState.status!=='PLAYING') return; SoundFX.init();el.setPointerCapture(e.pointerId);keys[keyName]=true;});
+      el.addEventListener('pointerdown',e=>{e.preventDefault(); if(isPaused()||gameState.status!=='PLAYING'||gameState.chapter==='CHASING') return; SoundFX.init();el.setPointerCapture(e.pointerId);keys[keyName]=true;});
       for(const event of ['pointerup','pointercancel','lostpointercapture']) el.addEventListener(event,e=>{e.preventDefault();keys[keyName]=false;});
     }
     bindDpad('dpad-up','w');bindDpad('dpad-down','s');bindDpad('dpad-left','a');bindDpad('dpad-right','d');
-    document.getElementById('btn-restart-quick').addEventListener('click',restartGame);
+    document.getElementById('btn-restart-quick').addEventListener('click',restartCurrentChapter);
     document.getElementById('btn-pause').addEventListener('click',()=>manualPause(true));
     document.getElementById('btn-resume').addEventListener('click',()=>manualPause(false));
     document.getElementById('btn-replay-opening').addEventListener('click',()=>{
+      if(gameState.chapter!=='SHOWROOM')return;
       manualPause(false);clearInput();opening.start();
     });
     document.getElementById('btn-toggle-map').addEventListener('click',()=>{
@@ -2344,7 +2448,7 @@
     function saveCurrentRun(openBoard=true) {
       if(gameState.status!=='VICTORY') return;
       const name=document.getElementById('player-name-input').value.trim().slice(0,16)||'潜行者';
-      const entry={id:gameState.runId,name,score:gameState.score,seconds:gameState.elapsedTime,note:'发布会样机 · '+formatTime(gameState.elapsedTime)};
+      const entry={id:gameState.runId,name,score:gameState.score,seconds:gameState.elapsedTime,note:'双关逃脱 · 追逐3分钟 · 血量'+gameState.chaseHealth+'%'};
       const old=leaderboardData.findIndex(x=>x.id===entry.id);
       if(old>=0) leaderboardData[old]=entry; else leaderboardData.push(entry);
       leaderboardData.sort((a,b)=>b.score-a.score||(a.seconds||0)-(b.seconds||0));leaderboardData=leaderboardData.slice(0,10);
@@ -2357,8 +2461,9 @@
     document.getElementById('btn-save-score').addEventListener('click',()=>saveCurrentRun(true));
 
     document.getElementById('btn-play-again').addEventListener('click', () => {
-      restartGame();
+      restartCurrentChapter();
     });
+    document.getElementById('btn-return-showroom').addEventListener('click',restartGame);
 
     // Catalog & Real Pricing Modal
     const catModal = document.getElementById('modal-catalog');
@@ -2384,6 +2489,7 @@
       renderer.setPixelRatio(Math.min(window.devicePixelRatio,window.innerWidth<700?1.5:2));
       renderer.setSize(window.innerWidth, window.innerHeight);
       opening.resize();
+      chaseRunner?.resize();
     });
 
     window.onload = () => {

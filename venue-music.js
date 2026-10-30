@@ -32,7 +32,7 @@
     }
     function unlock(event){
       if(event.type==='keydown'&&(event.repeat||event.ctrlKey||event.metaKey||event.altKey))return;
-      if(button.contains(event.target))return;
+      if(button.contains(event.target)||event.target.closest?.('[data-music-toggle]'))return;
       unlocked=true;blocked=false;render();sync();
     }
     button.addEventListener('click',()=>{
