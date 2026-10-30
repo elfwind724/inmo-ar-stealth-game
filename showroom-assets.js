@@ -30,14 +30,15 @@
       air3: {width:.73,height:.46,radius:.14,frame:0x151c23,lens:0x80aeb9,opacity:.30,arm:.15},
       go1:  {width:.66,height:.49,radius:.15,frame:0x26313e,lens:0xa2d3dd,opacity:.25,arm:.09},
       go2:  {width:.72,height:.44,radius:.09,frame:0x596973,lens:0xa3c9d3,opacity:.30,arm:.11},
-      go3:  {width:.70,height:.49,radius:.19,frame:0x19252b,lens:0xb2d1db,opacity:.25,arm:.10},
-      launch:{width:.73,height:.46,radius:.13,frame:0xb3a28b,lens:0x82b9be,opacity:.40,arm:.12}
+      go3:  {width:.70,height:.49,radius:.19,frame:0xe5e1d2,lens:0xb9d1ce,opacity:.12,arm:.10},
+      launch:{width:.73,height:.46,radius:.13,frame:0x151617,lens:0x33362b,opacity:.83,arm:.12}
     }[code];
-    const frameMat = new T.MeshPhysicalMaterial({color:params.frame,roughness:.29,metalness:.18,clearcoat:.6,clearcoatRoughness:.2,envMapIntensity:1.1});
-    const armMat = new T.MeshPhysicalMaterial({color:code==='air1'?0x343b46:params.frame,roughness:.34,metalness:.22,clearcoat:.45,envMapIntensity:1.1});
+    const boothModel=code==='go3'||code==='launch';
+    const frameMat = new T.MeshPhysicalMaterial({color:params.frame,roughness:code==='go3'?.38:.29,metalness:boothModel?.025:.18,clearcoat:.6,clearcoatRoughness:.2,envMapIntensity:boothModel?.8:1.1});
+    const armMat = new T.MeshPhysicalMaterial({color:code==='air1'?0x343b46:params.frame,roughness:.34,metalness:boothModel?.03:.22,clearcoat:.45,envMapIntensity:boothModel?.8:1.1});
     const lensMat = new T.MeshPhysicalMaterial({color:params.lens,roughness:.055,metalness:.08,transparent:true,opacity:params.opacity,depthWrite:false,side:T.DoubleSide,clearcoat:1,clearcoatRoughness:.06,envMapIntensity:1.45});
     const metal = new T.MeshStandardMaterial({color:0x9daeb9,roughness:.22,metalness:.85});
-    const led = new T.MeshBasicMaterial({color:0x64e5fa,toneMapped:false});
+    const led = boothModel?new T.MeshStandardMaterial({color:0x626963,roughness:.5,metalness:.05}):new T.MeshBasicMaterial({color:0x64e5fa,toneMapped:false});
     const add = (geo,mat,x,y,z) => {const m=new T.Mesh(geo,mat);m.position.set(x,y,z);m.castShadow=!mat.transparent;m.receiveShadow=true;group.add(m);return m;};
     for (const side of [-1,1]) {
       const outer=roundedPath(T,params.width,params.height,params.radius);
@@ -57,7 +58,7 @@
       const nose=add(new T.SphereGeometry(.05,12,8),new T.MeshPhysicalMaterial({color:0xc2d5dc,transparent:true,opacity:.56,roughness:.2}),side*.105,-.15,.405);
       nose.scale.set(.65,1.2,.6);nose.rotation.z=side*.25;
       // A pale reflection ribbon makes the lens plane legible at the game's fixed angle.
-      const gleam=add(new T.PlaneGeometry(.055,params.height*.63),new T.MeshBasicMaterial({color:0xc4f4ff,transparent:true,opacity:air?.17:.24,depthWrite:false,toneMapped:false}),side*.385-.12,.065,.459);
+      const gleam=add(new T.PlaneGeometry(.055,params.height*.63),new T.MeshBasicMaterial({color:boothModel?0xd5ddd4:0xc4f4ff,transparent:true,opacity:boothModel?.10:air?.17:.24,depthWrite:false,toneMapped:false}),side*.385-.12,.065,.459);
       gleam.rotation.z=-.38;
     }
     const bridge=new T.CatmullRomCurve3([new T.Vector3(-.11,.11,.443),new T.Vector3(0,.16,.456),new T.Vector3(.11,.11,.443)]);
@@ -143,6 +144,6 @@
     const shadow=contactShadow(T,5.6,3.3,.75);shadow.position.y=.015;car.add(shadow);
     return car;
   }
-  function conceptSVG(){return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 110"><defs><linearGradient id="lens"><stop stop-color="#689b9d" stop-opacity=".65"/><stop offset="1" stop-color="#b5e7dd" stop-opacity=".12"/></linearGradient></defs><path d="M38 33L67 15M221 33L195 15" stroke="#a99a82" stroke-width="9" fill="none"/><path d="M24 34H110Q130 24 150 34H236" stroke="#c7b18c" stroke-width="9" fill="none"/><rect x="30" y="35" width="79" height="50" rx="15" fill="url(#lens)" stroke="#c2b191" stroke-width="7"/><rect x="151" y="35" width="79" height="50" rx="15" fill="url(#lens)" stroke="#c2b191" stroke-width="7"/><path d="M109 44Q130 36 151 44" stroke="#c2b191" stroke-width="6" fill="none"/><text x="130" y="106" text-anchor="middle" fill="#a8b8b4" font-size="10" font-family="sans-serif">GAME CONCEPT / 游戏概念造型</text></svg>`;}
+  function conceptSVG(){return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 110"><defs><linearGradient id="lens"><stop stop-color="#5e6250" stop-opacity=".9"/><stop offset="1" stop-color="#25271f" stop-opacity=".75"/></linearGradient></defs><path d="M38 33L67 15M221 33L195 15" stroke="#252728" stroke-width="9" fill="none"/><path d="M24 34H110Q130 24 150 34H236" stroke="#202223" stroke-width="9" fill="none"/><rect x="30" y="35" width="79" height="50" rx="15" fill="url(#lens)" stroke="#202223" stroke-width="7"/><rect x="151" y="35" width="79" height="50" rx="15" fill="url(#lens)" stroke="#202223" stroke-width="7"/><path d="M109 44Q130 36 151 44" stroke="#202223" stroke-width="6" fill="none"/><text x="130" y="106" text-anchor="middle" fill="#a8b8b4" font-size="10" font-family="sans-serif">GAME CONCEPT / 游戏概念造型</text></svg>`;}
   root.INMOAssets={products,conceptSVG,createGlasses,createStudioEnvironment,linearizeScene,contactShadow,createCar};
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -176,9 +176,12 @@
     }
     function positionBubble(){
       const node=ensureBubble();if(!node||!dialogue)return;
+      const width=window.innerWidth,height=window.innerHeight;
+      if(dialogue.actor===player&&document.body.classList.contains('first-person')){
+        node.hidden=!group.visible;node.style.left=width*.5+'px';node.style.top=Math.max(130,height-160)+'px';return;
+      }
       const actor=dialogue.actor,anchor=actor?{...actor.pos,y:actor===player?2.55:actor.group.position.y+2.85*actor.group.scale.y}:dialogue.point;
       const projected=new T.Vector3(anchor.x,anchor.y,anchor.z).project(camera);
-      const width=window.innerWidth,height=window.innerHeight;
       const x=(projected.x*.5+.5)*width,y=(-projected.y*.5+.5)*height;
       node.hidden=!group.visible||projected.z>1||projected.z< -1;
       node.style.left=Math.max(145,Math.min(width-145,x))+'px';

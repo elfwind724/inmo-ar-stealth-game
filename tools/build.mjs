@@ -16,6 +16,8 @@ await fs.copyFile(path.join(root,'node_modules/three/build/three.min.js'),path.j
 await fs.copyFile(path.join(root,'node_modules/three/LICENSE'),path.join(dist,'vendor/THREE-LICENSE.txt'));
 const music=await fs.readFile(path.join(root,'assets/venue-bgm.mp3'));
 await fs.writeFile(path.join(dist,'assets/venue-bgm.mp3'),music);
+const boothPhotos=['booth-reference-wide.jpg','booth-reference-close.jpg'];
+for(const file of boothPhotos)await fs.copyFile(path.join(root,'assets',file),path.join(dist,'assets',file));
 let standalone=html;
 standalone=standalone.replace('src="./assets/venue-bgm.mp3"',()=> 'src="data:audio/mpeg;base64,'+music.toString('base64')+'"');
 const inlineScript=code=>'<script>\n'+code.replace(/<\/script/gi,'<\\/script')+'\n</script>';
@@ -26,6 +28,10 @@ for(const file of [...cssFiles,'assets/ui.css']){
 for(const file of [...jsFiles,'vendor/three.min.js']){
   const code=await fs.readFile(path.join(dist,file),'utf8');
   standalone=standalone.replace('<script src="./'+file+'"></script>',()=>inlineScript(code));
+}
+for(const file of boothPhotos){
+  const data=await fs.readFile(path.join(root,'assets',file));
+  standalone=standalone.replaceAll('./assets/'+file,'data:image/jpeg;base64,'+data.toString('base64'));
 }
 const license=await fs.readFile(path.join(dist,'vendor/THREE-LICENSE.txt'),'utf8');
 standalone='<!-- '+license+' -->\n'+standalone;

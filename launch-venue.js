@@ -3,7 +3,7 @@
 
   function build({THREE:T,scene,assets,makeTextTexture,addCollider,camera,sound}) {
     const group=new T.Group();group.name='inmo-launch-venue';scene.add(group);
-    const people=[],dancers=[],floaters=[],bubbles=[];
+    const people=[],dancers=[],bubbles=[];
     let elapsed=0,nextBubble=2.5,bubbleIndex=0,lastCheer=-1;
     let nextEmcee=1,nextLyric=15,nextStream=17,emceeLine=0,lyricLine=0,streamLine=0,storyCycle=-1,storyCue=-1;
     let overlayWidth=0,overlayHeight=0,nextOverlayMeasure=0,overlayObstacles=[];
@@ -17,6 +17,9 @@
       clothes:[M(0x253e51),M(0x735c4b),M(0x4d5b59),M(0x5c3f4b),M(0x324355),M(0x8c795d),M(0x2f383e),M(0x676571)],
       goldGlow:new T.MeshBasicMaterial({color:0xf3bc66,toneMapped:false}),redGlow:new T.MeshBasicMaterial({color:0xcc5635,toneMapped:false}),
       screen:new T.MeshBasicMaterial({color:0xa5d7d7,toneMapped:false}),eyes:new T.MeshBasicMaterial({color:0x1c2027})};
+    const booth={fabric:M(0xe7e6df,.91),frame:M(0xecece6,.40,.08),plinth:M(0xe9e9e4,.56),
+      table:M(0x121418,.94),tableTop:M(0x202126,.84),mat:M(0x9b9da5,.95),metal:M(0xabb3b5,.25,.88),
+      light:new T.MeshBasicMaterial({color:0xfff9e8,toneMapped:false})};
     function block(parent,w,h,d,x,y,z,material,cast=true){const m=new T.Mesh(geometry.box,material);m.scale.set(w,h,d);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=true;parent.add(m);return m;}
     function cylinder(parent,r,h,x,y,z,material){const m=new T.Mesh(geometry.cylinder,material);m.scale.set(r*2,h,r*2);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;}
     function sphere(parent,w,h,d,x,y,z,material){const m=new T.Mesh(geometry.sphere,material);m.scale.set(w,h,d);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m;}
@@ -39,16 +42,16 @@
         c.fillStyle='rgba(65,40,30,.72)';c.font='500 22px Arial,"Microsoft YaHei",sans-serif';c.fillText(outdoor?'LIVE STAGE  /  发布暖场':'A NEW DIMENSION  /  新品样机体验',W/2,571);
       });
     }
-    function truss(parent,x,z,height=4.8){
-      for(const dx of [-.17,.17])for(const dz of [-.17,.17])cylinder(parent,.035,height,x+dx,height/2,z+dz,palette.chrome);
-      for(let y=.35;y<height;y+=.55){block(parent,.42,.035,.035,x,y,z-.17,palette.chrome);block(parent,.035,.035,.42,x-.17,y,z,palette.chrome);}
+    function truss(parent,x,z,height=4.8,material=palette.chrome){
+      for(const dx of [-.17,.17])for(const dz of [-.17,.17])cylinder(parent,.035,height,x+dx,height/2,z+dz,material);
+      for(let y=.35;y<height;y+=.55){block(parent,.42,.035,.035,x,y,z-.17,material);block(parent,.035,.035,.42,x-.17,y,z,material);}
       addCollider(x,z,.45,.45);
     }
     function spotlight(parent,x,y,z,tx,tz,color=0xffcb82,intensity=.75){
       const lamp=new T.SpotLight(color,intensity,24,.58,.65,1);lamp.position.set(x,y,z);lamp.target.position.set(tx,.2,tz);parent.add(lamp,lamp.target);
       cylinder(parent,.18,.35,x,y,z,palette.ink);return lamp;
     }
-    // A warm, dark cutaway shell keeps the opening aisle and product clearly visible.
+    // Street and outdoor warm-up stage retain the existing cutaway layout.
     const sidewalkMap=tex(512,512,(c,W,H)=>{c.fillStyle='#303a44';c.fillRect(0,0,W,H);c.strokeStyle='#3c4851';c.lineWidth=2;for(let i=0;i<=4;i++){c.beginPath();c.moveTo(i*128,0);c.lineTo(i*128,H);c.stroke();c.beginPath();c.moveTo(0,i*128);c.lineTo(W,i*128);c.stroke();}});
     sidewalkMap.wrapS=sidewalkMap.wrapT=T.RepeatWrapping;sidewalkMap.repeat.set(10,7);
     floor(group,47,36,-1,3,new T.MeshStandardMaterial({map:sidewalkMap,roughness:.88}),-.025);
@@ -56,48 +59,94 @@
     for(const z of [12.5,12.8])floor(group,46,.08,0,z,palette.copper,.008);
     for(let i=0;i<5;i++)floor(group,1.15,3.7,-11+i*1.7,16.1,M(0xa6a99b,.86),.002);
     floor(group,28,16,0,-2,palette.stone,.008);
-    const floorMap=tex(512,512,(c,W,H)=>{c.fillStyle='#363238';c.fillRect(0,0,W,H);c.strokeStyle='#51443e';c.lineWidth=2;for(let i=0;i<=4;i++){c.beginPath();c.moveTo(i*128,0);c.lineTo(i*128,H);c.stroke();c.beginPath();c.moveTo(0,i*128);c.lineTo(W,i*128);c.stroke();}});
+    const floorMap=tex(512,512,(c,W,H)=>{
+      c.fillStyle='#d2b72c';c.fillRect(0,0,W,H);
+      c.fillStyle='#ddc33b';for(let y=0;y<H;y+=4)for(let x=(y%8?0:2);x<W;x+=5)c.fillRect(x,y,1,2);
+      c.strokeStyle='#b8a125';c.lineWidth=.7;for(let i=0;i<=4;i++){c.beginPath();c.moveTo(i*128,0);c.lineTo(i*128,H);c.stroke();}
+    });
     floorMap.wrapS=floorMap.wrapT=T.RepeatWrapping;floorMap.repeat.set(7,4);
-    floor(group,27.6,15.6,0,-2,new T.MeshStandardMaterial({map:floorMap,roughness:.54,metalness:.17}),.013);
-    floor(group,5.6,11,0,.2,M(0x502c36,.94),.022);
-    for(const x of [-3.65,3.65])floor(group,.055,10.6,x,.4,palette.brass,.028);
-    block(group,28,4.7,.32,0,2.25,-9.85,palette.wall);
+    floor(group,27.6,15.6,0,-2,new T.MeshStandardMaterial({map:floorMap,roughness:.98}),.013);
+    floor(group,24.0,5.2,0,-7.0,booth.mat,.018);
+    block(group,28,4.7,.32,0,2.25,-9.85,booth.fabric);
     for(const side of [-1,1]){
       block(group,.32,.65,16,side*14,.28,-2,palette.wall);block(group,.34,.08,16,side*14,.62,-2,palette.copper);
       block(group,side<0?11:13,.45,.30,side<0?-8.5:7.45,.18,6,palette.wall);
       block(group,.07,.05,15.3,side*13.65,.07,-2,palette.goldGlow,false);
-      truss(group,side*11.9,-8.9,4.75);truss(group,side*12,4.8,3.8);
+      truss(group,side*11.9,-8.9,4.75,booth.frame);truss(group,side*12,4.8,3.8);
     }
     block(group,3.9,.16,.28,-1,3.15,6,palette.copper);
     for(const x of [-3,1]){block(group,.18,3.2,.22,x,1.55,6,palette.copper);addCollider(x,6,.23,.3);}
     label(group,'INMO 影目 · 11.04',3.3,-1,3.18,6.18,'#f4d7a1','#2c282a');
     floor(group,3.5,2.0,-1,7.4,M(0x563b31,.88),.015);
     const welcome=label(group,'新品发布会  /  入场',3.1,-1,.035,7.65);welcome.rotation.x=-Math.PI/2;
-    // Main launch stage: all substantial scenery sits behind the hero pedestal.
-    block(group,20,.15,4.25,0,.055,-7.55,palette.ink);
-    block(group,20.1,.035,.09,0,.15,-5.45,palette.goldGlow,false);
-    panel(group,poster(),17.7,4.42,0,2.65,-9.61);
-    for(const side of [-1,1]){
-      block(group,.22,4.7,.18,side*9.1,2.31,-9.45,palette.copper);
-      for(let i=0;i<3;i++){
-        const cube=new T.Group();cube.position.set(side*(8.7+i*.65),2.9+i*.57,-8.5-i*.13);group.add(cube);
-        block(cube,1.45-i*.15,1.3-i*.12,1.25,0,0,0,i%2?palette.copper:palette.brass);
-        for(let seam=-.4;seam<=.4;seam+=.4)block(cube,.012,1.32-i*.12,1.27,seam,0,0,palette.ink);
-        cube.rotation.set(.12,side*.30,-side*.1);floaters.push({mesh:cube,baseY:cube.position.y,phase:i+side});
-      }
-      spotlight(group,side*8.2,5.6,-5.1,0,-5.8,0xffd49a,.85);
-      spotlight(group,side*11,4.6,1,side*8,-3,0xffb367,.55);
+    // The supplied booth photo is printed on the rear fabric wall. Crop only its
+    // central artwork, excluding the surrounding exhibition hall and front tables.
+    const boothFallback=document.createElement('canvas');boothFallback.width=1440;boothFallback.height=1080;
+    const fallbackCtx=boothFallback.getContext('2d');fallbackCtx.fillStyle='#e9e9e1';fallbackCtx.fillRect(0,0,1440,1080);
+    const fallbackBand=fallbackCtx.createLinearGradient(390,540,1115,300);fallbackBand.addColorStop(0,'#e4c41a');fallbackBand.addColorStop(1,'#ed6723');
+    fallbackCtx.fillStyle=fallbackBand;fallbackCtx.beginPath();fallbackCtx.moveTo(390,500);fallbackCtx.lineTo(1115,290);fallbackCtx.lineTo(1115,385);fallbackCtx.lineTo(390,555);fallbackCtx.closePath();fallbackCtx.fill();
+    fallbackCtx.fillStyle='#151719';fallbackCtx.font='700 74px Arial,sans-serif';fallbackCtx.fillText('inmo',444,411);fallbackCtx.fillStyle='#ee5226';fallbackCtx.fillRect(448,351,9,8);
+    const boothMaps=[];
+    const boothPhoto=new T.TextureLoader().load('./assets/booth-reference-wide.jpg',loaded=>{
+      for(const map of boothMaps){map.image=loaded.image;map.needsUpdate=true;}
+    });
+    boothPhoto.encoding=T.sRGBEncoding;
+    function boothCrop(x,y,w,h){
+      const map=boothPhoto.clone();map.encoding=T.sRGBEncoding;
+      map.repeat.set(w/1440,h/1080);map.offset.set(x/1440,1-(y+h)/1080);
+      if(!map.image){map.image=boothFallback;map.needsUpdate=true;}
+      boothMaps.push(map);return map;
     }
-    const launchFill=new T.PointLight(0xf2bc78,.34,17,1);launchFill.position.set(0,4,-6);group.add(launchFill);
-    // Experience bars give attendees something tangible to inspect besides the hero target.
+    block(group,20,.15,4.25,0,.055,-7.55,booth.mat);
+    block(group,20.1,.035,.09,0,.15,-5.45,booth.frame,false);
+    panel(group,boothCrop(390,285,725,275),12.15,4.5,0,2.35,-9.61);
+    for(const x of [-6.16,6.16])block(group,.16,4.65,.19,x,2.35,-9.52,booth.frame);
+    block(group,12.47,.13,.22,0,4.64,-9.49,booth.frame);
+    // Thin fabric seams and a real white top rail give the booth depth.
+    for(const x of [-12,-10,-8,8,10,12])block(group,.025,4.35,.018,x,2.29,-9.675,booth.frame,false);
+    block(group,24,.14,.15,0,4.76,-8.93,booth.frame);
+    for(const x of [-8,-4,0,4,8]){
+      block(group,.11,.36,.11,x,4.72,-8.93,booth.frame);
+      const lamp=cylinder(group,.13,.28,x,4.50,-8.93,booth.frame);lamp.rotation.x=-.25;
+      const glow=cylinder(group,.115,.012,x,4.35,-8.89,booth.light);glow.rotation.x=-.25;
+      const fill=new T.SpotLight(0xfffbef,.5,14,.65,.75,1);fill.position.set(x,4.45,-8.8);fill.target.position.set(x*.65,.8,-6.5);group.add(fill,fill.target);
+    }
+    for(const side of [-1,1]){
+      block(group,.22,4.7,.18,side*13.35,2.31,-9.45,booth.frame);
+      spotlight(group,side*11,4.6,1,side*8,-3,0xffe3b7,.42);
+    }
+    const launchFill=new T.PointLight(0xfff8e6,.38,17,1);launchFill.position.set(0,4,-6);group.add(launchFill);
+    function boothBrand(text,inverted=false){
+      return tex(512,192,(c,W,H)=>{
+        c.fillStyle=inverted?'#111318':'#e9e9e4';c.fillRect(0,0,W,H);c.fillStyle=inverted?'#f0f0e9':'#17191b';
+        c.font='700 112px Arial,sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('inmo',W/2,text?67:99);
+        c.fillStyle='#f05022';c.fillRect(126,text?12:42,14,11);
+        if(text){c.fillStyle='#303435';c.font='500 43px Arial,sans-serif';c.fillText(text,W/2,153);}
+      });
+    }
+    // The bar footprints and colliders are unchanged; white display towers sit
+    // behind their black cloth fronts, with metal stands like the reference.
     for(const side of [-1,1]){
       const x=side*9;
-      block(group,4.6,.92,1.35,x,.46,-7.3,palette.ink);block(group,4.7,.07,1.42,x,.96,-7.3,palette.copper);
-      block(group,4.5,.04,.03,x,.73,-6.6,palette.goldGlow,false);addCollider(x,-7.3,4.7,1.4);
-      label(group,'AR 体验区',3.1,x,.58,-6.59,'#eacb93','#222832');
+      block(group,4.6,.92,1.35,x,.46,-7.3,booth.table);block(group,4.7,.07,1.42,x,.96,-7.3,booth.tableTop);
+      addCollider(x,-7.3,4.7,1.4);
+      const clothGeometry=new T.PlaneGeometry(4.6,.88,36,4),clothPositions=clothGeometry.attributes.position;
+      for(let i=0;i<clothPositions.count;i++)clothPositions.setZ(i,Math.sin(clothPositions.getX(i)*15)*.014*(.7-clothPositions.getY(i)));
+      clothGeometry.computeVertexNormals();
+      const cloth=new T.Mesh(clothGeometry,booth.table);cloth.position.set(x,.49,-6.61);cloth.receiveShadow=true;group.add(cloth);
+      panel(group,boothBrand('',true),2.1,.79,x,.52,-6.56);
+      const towerX=x+side*1.65;
+      block(group,1.18,2.65,1.12,towerX,1.34,-7.35,booth.plinth);
+      block(group,1.27,.06,1.18,towerX,2.70,-7.35,booth.frame);
+      panel(group,boothBrand(side<0?'GO3':'AIR3'),1.12,.42,towerX,2.39,-6.775);
+      const portrait=side<0?boothCrop(342,608,163,166):boothCrop(982,610,135,162);
+      panel(group,portrait,1.10,1.22,towerX,1.52,-6.775);
       for(const offset of [-1.15,1.15]){
-        block(group,1.25,.08,.8,x+offset,1.04,-7.24,palette.black);
-        const glasses=assets.createGlasses(T,side<0?'air3':'go3');glasses.scale.setScalar(.64);glasses.position.set(x+offset,1.12,-7.15);group.add(glasses);
+        const standX=x+offset*.78;
+        block(group,.78,.025,.58,standX,1.015,-7.14,booth.metal);
+        cylinder(group,.020,.43,standX,1.24,-7.14,booth.metal);
+        block(group,.25,.028,.09,standX,1.46,-7.14,booth.metal);
+        const glasses=assets.createGlasses(T,side<0?'go3':'air3');glasses.scale.setScalar(.64);glasses.position.set(standX,1.49,-7.15);group.add(glasses);
       }
     }
     function stationTable(key,color,text){
@@ -420,7 +469,6 @@
       const cycle=elapsed%18,show=cycle>7&&cycle<11.5;
       const cheerCycle=Math.floor(elapsed/18);
       if(show&&lastCheer!==cheerCycle){lastCheer=cheerCycle;cheer();}
-      floaters.forEach(f=>{f.mesh.position.y=f.baseY+Math.sin(elapsed*.65+f.phase)*.075;f.mesh.rotation.y+=dt*.035;});
       for(const p of people){
         const t=elapsed+p.phase,attentionCycle=t%p.attentionPeriod;let walking=false;
         const isPhone=p.role!=='dancer'&&attentionCycle>p.attentionPeriod-(p.role==='security'?3.2:2.8);

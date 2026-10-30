@@ -260,6 +260,7 @@
 
   <div id="minimap-panel" class="hud-panel collapsed">
     <button id="btn-toggle-map" aria-expanded="false" aria-controls="minimap-content"><span>⌖ 地图</span><span id="player-zone-label">街道 · 安全</span></button>
+    <button id="btn-camera-mode" class="hud-btn" type="button" aria-label="切换到第一人称视角" aria-pressed="false">俯视 · 切换视角</button>
     <div id="minimap-content"><canvas id="minimap-canvas" width="240" height="144" aria-label="展厅监控、柜台和玩家位置"></canvas></div>
   </div>
 
@@ -430,9 +431,10 @@
       <div class="dialog-kicker">INMO / STEALTH OPERATION</div>
       <h2 id="pause-title">行动已暂停</h2>
       <p>目标是店内主舞台的神秘新品样机。正常走动和交谈安全；开柜或取镜时被持续注意才会失败，移动可取消动作。</p>
-      <div class="controls-grid"><div>屏幕方向移动 <kbd>WASD / ↑↓←→</kbd></div><div>取走样机 <kbd>E / 空格</kbd></div><div>慢走蹲姿 <kbd>Shift / C</kbd></div><div>暂停 / 继续 <kbd>Esc / P</kbd></div><div>重置视角 <kbd>V</kbd></div><div>重新开始 <kbd>R</kbd></div></div>
+      <div class="controls-grid"><div>移动 <kbd>WASD / ↑↓←→</kbd></div><div>取走样机 <kbd>E / 空格</kbd></div><div>慢走蹲姿 <kbd>Shift / C</kbd></div><div>暂停 / 继续 <kbd>Esc / P</kbd></div><div>切换 / 重置视角 <kbd>F / V</kbd></div><div>重新开始 <kbd>R</kbd></div></div>
       <p>靠近可交谈的人或可查看的物件，按 E 互动。展柜需要钥匙；开柜后再按 E 取镜。被注意时可以移动取消动作，鼠标滚轮不缩放。</p>
-      <div class="settings-row"><button id="btn-crouch-toggle" class="hud-btn"><span id="crouch-btn-label">站立行走</span></button><button id="btn-reset-cam" class="hud-btn">45° 视角</button><button id="btn-audio-toggle" class="hud-btn"><span id="audio-btn-label">音效开启</span></button></div>
+      <p>俯视模式按屏幕方向移动；第一人称按面朝方向移动，右键拖动看四周。触屏保留左侧方向键，右半屏拖动观察，轻点人物或近处地面走近。</p>
+      <div class="settings-row"><button id="btn-crouch-toggle" class="hud-btn"><span id="crouch-btn-label">站立行走</span></button><button id="btn-reset-cam" class="hud-btn">重置视角</button><button id="btn-audio-toggle" class="hud-btn"><span id="audio-btn-label">音效开启</span></button></div>
       <div class="dialog-actions"><button id="btn-resume" class="primary-action">继续行动</button><button id="btn-replay-opening" class="hud-btn">重看开场</button><button id="btn-restart-quick" class="hud-btn">重新开始</button></div>
     </div>
   </div>
@@ -655,6 +657,8 @@
     const DEFAULT_CAM_OFFSET = new THREE.Vector3(-19, 33, 27);
     let camYawOffset = 0.0;
     const cameraTarget = new THREE.Vector3(0, 0.5, 1.5);
+    let cameraMode='overhead',fpYaw=Math.PI,fpPitch=-.06,firstPersonUsed=false;
+    const fpLookTarget=new THREE.Vector3();
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -751,27 +755,22 @@
         const cg = new THREE.Group();
         cg.position.set(item.pos.x, 0, item.pos.z);
 
-        // Front Texture with bold Counter Number ("1" .. "6") matching Image 1 & 2
+        // A black fabric-covered display table follows the supplied booth photos.
         const frontTex = makeTextTexture({
-          width: 512, height: 256, bg: '#172d3a',
+          width: 512, height: 256, bg: '#17191c',
           drawFn(ctx, w, h) {
-            // Subtle vertical split seam
-            ctx.strokeStyle = '#2b4b5d';
-            ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke();
-            // Number on left side
-            ctx.fillStyle = '#c5dfeb';
-            ctx.font = '800 135px Inter, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(String(item.counterNum), 115, 178);
-            ctx.textAlign='left';ctx.font='600 23px sans-serif';ctx.fillStyle='#8db2c6';
-            ctx.fillText(item.name,225,116);ctx.font='21px sans-serif';ctx.fillText('LAUNCH / 11.04',225,159);
+            ctx.strokeStyle='#212327';ctx.lineWidth=1;
+            for(let x=0;x<w;x+=4){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+            ctx.font='900 145px Arial,sans-serif';ctx.textAlign='left';
+            const textWidth=ctx.measureText('nmo').width,left=(w-textWidth-34)/2;
+            ctx.fillStyle='#e9e5d9';ctx.fillRect(left,108,23,76);ctx.fillText('nmo',left+34,184);
+            ctx.fillStyle='#d33b25';ctx.beginPath();ctx.moveTo(left,88);ctx.lineTo(left+23,82);ctx.lineTo(left+23,99);ctx.lineTo(left,99);ctx.fill();
           }
         });
 
-        const sideMat = new THREE.MeshStandardMaterial({ color: 0x3b3029, roughness: 0.48, metalness: .25 });
-        const topMat = new THREE.MeshStandardMaterial({ color: 0x635444, roughness: 0.32, metalness: .3, envMapIntensity: .55 });
-        const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.35 });
+        const sideMat = new THREE.MeshStandardMaterial({ color: 0x1e2023, roughness: .97, metalness: 0, envMapIntensity: .12 });
+        const topMat = new THREE.MeshStandardMaterial({ color: 0x24262a, roughness: .94, metalness: 0, envMapIntensity: .14 });
+        const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: .98, metalness: 0, envMapIntensity: .12 });
 
         // Pedestal Base Box (3.2 x 1.25 x 1.75)
         const baseMesh = new THREE.Mesh(
@@ -783,74 +782,91 @@
         baseMesh.receiveShadow = true;
         cg.add(baseMesh);
         const contactShadow=INMOAssets.contactShadow(THREE,4.8,3.35,.66);contactShadow.position.y=.027;cg.add(contactShadow);
-        const rim = new THREE.Mesh(new THREE.BoxGeometry(3.24,.035,1.79),new THREE.MeshStandardMaterial({color:0xb0966d,metalness:.65,roughness:.3}));
+        const rim = new THREE.Mesh(new THREE.BoxGeometry(3.24,.035,1.79),topMat);
         rim.position.y=1.28;cg.add(rim);
+        const foldMat=new THREE.MeshStandardMaterial({color:0x25272a,roughness:1,metalness:0,envMapIntensity:.08});
+        for(const x of [-1.53,-1.31,-1.09,1.10,1.33,1.53]){
+          const fold=new THREE.Mesh(new THREE.BoxGeometry(.035,1.16,.042),foldMat);
+          fold.position.set(x,.66,.883);fold.rotation.z=x<0?-.012:.012;fold.receiveShadow=true;cg.add(fold);
+        }
+        for(const side of [-1,1])for(const z of [-.65,-.27,.17,.59]){
+          const fold=new THREE.Mesh(new THREE.BoxGeometry(.042,1.16,.038),foldMat);
+          fold.position.set(side*1.607,.66,z);fold.receiveShadow=true;cg.add(fold);
+        }
         // A small visible keyhole makes the locked case readable in the scene.
-        const lockPlate=new THREE.Mesh(new THREE.BoxGeometry(.18,.25,.035),new THREE.MeshStandardMaterial({color:0xbba17a,metalness:.7,roughness:.3}));
+        const lockPlate=new THREE.Mesh(new THREE.BoxGeometry(.18,.25,.035),new THREE.MeshStandardMaterial({color:0x9ba3a2,metalness:.7,roughness:.36}));
         lockPlate.position.set(1.25,.70,.90);cg.add(lockPlate);
         const keyhole=new THREE.Mesh(new THREE.CircleGeometry(.037,12),new THREE.MeshBasicMaterial({color:0x10191d}));
         keyhole.position.set(1.25,.735,.921);cg.add(keyhole);
         const keySlot=new THREE.Mesh(new THREE.BoxGeometry(.035,.07,.012),new THREE.MeshBasicMaterial({color:0x10191d}));
         keySlot.position.set(1.25,.69,.923);cg.add(keySlot);
-        const foot = new THREE.Mesh(new THREE.BoxGeometry(3.0,.15,1.57),new THREE.MeshStandardMaterial({color:0x101d27,roughness:.55}));
+        const foot = new THREE.Mesh(new THREE.BoxGeometry(3.0,.15,1.57),sideMat);
         foot.position.y=.10;cg.add(foot);
 
-        // Glowing Blue Underglow Strip around base (exact match to Image 1 & 2)
+        // Retain the state handle used by reset/success without a decorative LED.
         const ledStrip = new THREE.Mesh(
           new THREE.BoxGeometry(3.28, 0.08, 1.83),
-          new THREE.MeshBasicMaterial({ color: 0xe6ba73 })
+          new THREE.MeshBasicMaterial({ color: 0x191b1f })
         );
         ledStrip.position.y = 0.04;
+        ledStrip.visible=false;
         cg.add(ledStrip);
 
-        // White Display Riser Pad for the Glasses
+        // Brushed silver footplate and slender upright eyewear cradle.
+        const standMat=new THREE.MeshStandardMaterial({color:0xb7bcba,roughness:.27,metalness:.82,envMapIntensity:.75});
         const pad = new THREE.Mesh(
-          new THREE.BoxGeometry(1.95, 0.10, 1.3),
-          new THREE.MeshStandardMaterial({ color: 0x152531, roughness: .87, metalness: .0 })
+          new THREE.BoxGeometry(1.95, .025, 1.22),standMat
         );
-        pad.position.set(-0.32, 1.35, 0);
+        pad.position.set(-.32,1.315,.08);
         pad.receiveShadow=true;
         cg.add(pad);
-        const productShadow=INMOAssets.contactShadow(THREE,2.15,1.5,.38);productShadow.position.set(-.32,1.408,0);cg.add(productShadow);
+        const upright=new THREE.Mesh(new THREE.CylinderGeometry(.022,.026,.50,12),standMat);
+        upright.position.set(-.32,1.575,.60);cg.add(upright);
+        const cradle=new THREE.Mesh(new THREE.TorusGeometry(.072,.016,7,14,Math.PI),standMat);
+        cradle.rotation.z=Math.PI;cradle.position.set(-.32,1.90,.60);cg.add(cradle);
+        const productShadow=INMOAssets.contactShadow(THREE,1.9,1.2,.20);productShadow.position.set(-.32,1.332,.08);cg.add(productShadow);
 
         // 3D AR Glasses Model sitting on the Riser Pad
         const glasses3D = create3DGlassesMesh(item.code);
         glasses3D.position.set(-0.32, 1.69, .18);
+        glasses3D.rotation.x=-.07;
         cg.add(glasses3D);
-        const spotlight=new THREE.SpotLight(0xffedcf,1.75,13,.48,.72,1.15);
+        const spotlight=new THREE.SpotLight(0xffedcf,.95,13,.48,.72,1.15);
         spotlight.position.set(item.pos.x-1,6.2,item.pos.z+1.3);spotlight.target.position.set(item.pos.x,1.4,item.pos.z);
         scene.add(spotlight,spotlight.target);
         const fixture=new THREE.Mesh(new THREE.CylinderGeometry(.10,.13,.35,12),new THREE.MeshStandardMaterial({color:0x182735,metalness:.6,roughness:.3}));
         fixture.position.copy(spotlight.position);fixture.rotation.x=.18;scene.add(fixture);
 
-        // Small Angled Digital Price Tag Plaque on the right of the counter top (matching Image 2)
+        // Acrylic MAGICAI campaign card, cropped in UV space from the user photo.
         const plaqueTex = makeTextTexture({
-          width: 256, height: 256, bg: '#1e293b',
+          width: 338, height: 497, bg: '#deddd2',
           drawFn(ctx, w, h) {
-            ctx.fillStyle = '#f8fafc';
-            ctx.font = 'bold 23px Inter, sans-serif';
-            ctx.fillText(item.name, 22, 65);
-            ctx.fillStyle = '#38bdf8';
-            ctx.font = 'bold 46px JetBrains Mono, monospace';
-            ctx.fillText(item.displayPrice, 22, 130);
-            ctx.fillStyle = '#64748b';
-            ctx.fillRect(22, 165, 160, 12);
-            ctx.fillRect(22, 190, 110, 12);
+            ctx.textAlign='center';ctx.fillStyle='#252824';ctx.font='800 33px Arial,sans-serif';ctx.fillText('inmo',w/2,56);
+            ctx.font='700 46px Arial,sans-serif';ctx.fillText('MAGICAI',w/2,119);
+            ctx.strokeStyle='#434843';ctx.lineWidth=13;
+            for(const x of [99,239]){ctx.beginPath();ctx.moveTo(x-34,207);ctx.lineTo(x+34,207);ctx.quadraticCurveTo(x+55,207,x+55,230);ctx.lineTo(x+55,256);ctx.quadraticCurveTo(x+55,279,x+34,279);ctx.lineTo(x-34,279);ctx.quadraticCurveTo(x-55,279,x-55,256);ctx.lineTo(x-55,230);ctx.quadraticCurveTo(x-55,207,x-34,207);ctx.stroke();}
+            ctx.beginPath();ctx.moveTo(154,229);ctx.quadraticCurveTo(169,217,184,229);ctx.stroke();
+            ctx.fillStyle='#766889';ctx.fillRect(53,346,w-106,90);
+            ctx.fillStyle='#383e3b';ctx.font='16px Arial,sans-serif';ctx.fillText('INMO / EYEWEAR',w/2,472);
           }
         });
-        const plaque = new THREE.Mesh(
-          new THREE.BoxGeometry(0.62, 0.52, 0.35),
-          new THREE.MeshStandardMaterial({ map: plaqueTex, roughness: 0.3 })
-        );
-        plaque.position.set(1.05, 1.48, 0.05);
-        plaque.rotation.x = -0.25;
+        const plaqueMat=new THREE.MeshStandardMaterial({map:plaqueTex,color:0xdedbd1,roughness:.76,metalness:0,envMapIntensity:.15,side:THREE.DoubleSide});
+        new THREE.TextureLoader().load('./assets/booth-reference-close.jpg',texture=>{
+          texture.encoding=THREE.sRGBEncoding;texture.repeat.set(338/1440,497/1084);texture.offset.set(440/1440,178/1084);
+          texture.anisotropy=4;texture.needsUpdate=true;plaqueMat.map=texture;plaqueMat.needsUpdate=true;
+        },undefined,()=>{});
+        const plaque = new THREE.Mesh(new THREE.PlaneGeometry(.61,.90),plaqueMat);
+        plaque.position.set(1.03,1.78,.15);
         cg.add(plaque);
+        const acrylic=new THREE.Mesh(new THREE.BoxGeometry(.64,.93,.018),new THREE.MeshPhysicalMaterial({color:0xc6d1ce,transparent:true,opacity:.11,roughness:.13,metalness:0,depthWrite:false}));
+        acrylic.position.set(1.03,1.78,.135);cg.add(acrylic);
+        const plaqueFoot=new THREE.Mesh(new THREE.BoxGeometry(.68,.025,.22),standMat);plaqueFoot.position.set(1.03,1.325,.14);cg.add(plaqueFoot);
 
         // Glass Vitrine Cover on Top
         const vitrine = new THREE.Mesh(
           new THREE.BoxGeometry(3.05, .95, 1.6),
           new THREE.MeshPhysicalMaterial({
-            color: 0xbce5ef,
+            color: 0xd6dedb,
             transparent: true,
             opacity: .045,
             depthWrite: false,
@@ -863,7 +879,7 @@
         vitrine.position.y = 1.78;
         vitrine.renderOrder=4;
         cg.add(vitrine);
-        const glassEdges=new THREE.LineSegments(new THREE.EdgesGeometry(vitrine.geometry),new THREE.LineBasicMaterial({color:0x97c9dd,transparent:true,opacity:.24}));
+        const glassEdges=new THREE.LineSegments(new THREE.EdgesGeometry(vitrine.geometry),new THREE.LineBasicMaterial({color:0xb5c6c9,transparent:true,opacity:.18}));
         glassEdges.position.y=1.78;cg.add(glassEdges);
 
         // Selection / Highlight Ring around counter when targeted
@@ -1386,8 +1402,8 @@
 
     const keys = {};
     const pauseReasons = new Set();
-    let isDraggingCamera = false;
-    let dragStartX = 0;
+    const canvasPointers=new Map();
+    let lookPointerId=null;
     let toastTimer;
     let modalReturnFocus = null;
     function showToast(message, duration = 2800) {
@@ -1398,7 +1414,8 @@
     function clearInput() {
       Object.keys(keys).forEach(k => { keys[k] = false; });
       player.isMoving = false;
-      isDraggingCamera = false;
+      for(const id of canvasPointers.keys())if(renderer.domElement.hasPointerCapture(id))renderer.domElement.releasePointerCapture(id);
+      canvasPointers.clear();lookPointerId=null;
     }
     function isPaused() { return pauseReasons.size > 0; }
     function setPaused(reason, paused) {
@@ -1469,6 +1486,7 @@
       if (k === 'shift' || k === 'c') toggleCrouch();
       if (k === 'e' || k === ' ') interactNearby();
       if (k === 'v') resetCameraView();
+      if (k === 'f') toggleCameraMode();
       if (k === 'm') toggleAudio();
       if (k === 'r') restartGame();
     });
@@ -1496,7 +1514,52 @@
     }
 
     function resetCameraView() {
-      camYawOffset = 0.0;
+      clearInput();
+      if(cameraMode==='first-person'){fpYaw=Math.PI;fpPitch=-.06;}
+      else camYawOffset=0;
+      updateGameCamera(0,true);
+    }
+    function updateGameCamera(dt,snap=false){
+      const firstPerson=cameraMode==='first-person';
+      player.group.visible=!firstPerson;
+      if(firstPerson){
+        const forwardX=Math.sin(fpYaw),forwardZ=Math.cos(fpYaw);
+        // The small forward offset stays well inside the player's collision radius.
+        const eyeHeight=player.isCrouching?1.13:1.75;
+        camera.position.set(player.pos.x+forwardX*.08,eyeHeight,player.pos.z+forwardZ*.08);
+        const horizontal=Math.cos(fpPitch);
+        fpLookTarget.set(camera.position.x+forwardX*horizontal,camera.position.y+Math.sin(fpPitch),camera.position.z+forwardZ*horizontal);
+        camera.lookAt(fpLookTarget);
+      }else{
+        const targetFocusX=player.pos.x*(window.innerWidth<700?.72:.26);
+        const targetFocusZ=(player.pos.z-1)*.16-.3;
+        const blend=snap?1:Math.min(1,dt*5);
+        cameraTarget.x+=(targetFocusX-cameraTarget.x)*blend;
+        cameraTarget.z+=(targetFocusZ-cameraTarget.z)*blend;
+        const cos=Math.cos(camYawOffset),sin=Math.sin(camYawOffset);
+        const ox=DEFAULT_CAM_OFFSET.x*cos-DEFAULT_CAM_OFFSET.z*sin,oz=DEFAULT_CAM_OFFSET.x*sin+DEFAULT_CAM_OFFSET.z*cos;
+        const fitScale=Math.max(1,Math.min(1.8,1.1/camera.aspect));
+        camera.position.set(cameraTarget.x+ox*fitScale,DEFAULT_CAM_OFFSET.y*fitScale,cameraTarget.z+oz*fitScale);
+        camera.lookAt(cameraTarget);
+      }
+      camera.updateMatrixWorld(true);
+    }
+    function toggleCameraMode(){
+      if(opening.active)return;
+      clearInput();player.path=[];player.targetDest=null;clickMarker.material.opacity=0;cancelSteal(false);
+      cameraMode=cameraMode==='overhead'?'first-person':'overhead';
+      const firstPerson=cameraMode==='first-person';
+      camera.fov=firstPerson?70:36;camera.near=firstPerson?.08:.5;camera.updateProjectionMatrix();
+      document.body.classList.toggle('first-person',firstPerson);
+      const button=document.getElementById('btn-camera-mode');
+      button.textContent=firstPerson?'第一人称 · 切换':'俯视 · 切换视角';
+      button.setAttribute('aria-label',firstPerson?'切换到45度俯视视角':'切换到第一人称视角');
+      button.setAttribute('aria-pressed',String(firstPerson));
+      tooltipEl.classList.add('hidden');updateGameCamera(0,true);
+      if(firstPerson&&!firstPersonUsed){
+        firstPersonUsed=true;
+        showToast('第一人称：方向键移动，右侧拖动看四周；鼠标可按住右键观察。',5500);
+      }
     }
 
     function toggleAudio() {
@@ -1708,6 +1771,7 @@
       // Reset player outside store entrance on street
       player.pos.set(-1.0, 0, 8.8);
       player.angle = Math.PI;
+      fpYaw=Math.PI;fpPitch=-.06;
       player.targetDest = null;
       toggleCrouch(false);
 
@@ -1736,6 +1800,7 @@
       document.getElementById('modal-endgame').classList.remove('flex');
 
       renderMissionListUI();
+      updateGameCamera(0,true);
       showToast('新的一局开始，先寻找展柜钥匙。');
     }
 
@@ -1754,26 +1819,29 @@
     const venueMusic=VenueMusic.create({audio:document.getElementById('venue-music'),button:document.getElementById('btn-music-toggle'),
       canPlay:()=>!opening.active&&gameState.status==='PLAYING'});
 
-    renderer.domElement.addEventListener('pointerdown', (e) => {
-      if(opening.active)return;
-      if (gameState.status !== 'PLAYING' || isPaused()) return;
-      SoundFX.init();
-      if (e.button === 2 || e.button === 1) {
-        isDraggingCamera = true;
-        renderer.domElement.setPointerCapture(e.pointerId);
-        dragStartX = e.clientX;
-        return;
-      }
-      if (e.button !== 0 || gameState.status !== 'PLAYING') return;
-
+    function pickWorld(clientX,clientY){
+      if(opening.active||gameState.status!=='PLAYING'||isPaused())return;
+      updateGameCamera(0);scene.updateMatrixWorld(true);
       const rect = renderer.domElement.getBoundingClientRect();
-      mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouseNDC, camera);
-
+      // Eye-level clicks stop at visible solid scenery rather than selecting
+      // a person through a wall or sending the player toward the horizon.
+      let nearestSolid=Infinity;
+      if(cameraMode==='first-person'){
+        for(const hit of raycaster.intersectObjects(scene.children,true)){
+          if(!hit.object.isMesh)continue;
+          let visible=true;for(let parent=hit.object;parent;parent=parent.parent)if(!parent.visible){visible=false;break;}
+          const materials=Array.isArray(hit.object.material)?hit.object.material:[hit.object.material];
+          if(visible&&materials.some(m=>m&&m.visible&&m.depthWrite!==false&&(!m.transparent||m.opacity>=.8))){nearestSolid=hit.distance;break;}
+        }
+      }
+      const notOccluded=hit=>cameraMode!=='first-person'||hit.distance<=nearestSolid+.18;
       const clueHits=raycaster.intersectObjects(puzzle.targets.flatMap(t=>t.marker?[t.group,t.marker]:[t.group]),true);
-      if(clueHits.length){
-        const selected=puzzle.targets.find(t=>t.group.getObjectById(clueHits[0].object.id)||t.marker===clueHits[0].object);
+      const clueHit=clueHits.find(notOccluded);
+      if(clueHit){
+        const selected=puzzle.targets.find(t=>t.group.getObjectById(clueHit.object.id)||t.marker===clueHit.object);
         if(selected){
           if(Math.hypot(player.pos.x-selected.interactionPoint.x,player.pos.z-selected.interactionPoint.z)>selected.range)
             navigateTo(selected.approach,selected.kind==='key'?'可查看的名册':'可交谈的人');
@@ -1784,8 +1852,9 @@
       // Click the cabinet to approach; E confirms the interaction.
       const counterBoxes = counterMeshes.map(c => c.group);
       const hits = raycaster.intersectObjects(counterBoxes, true);
-      if (hits.length > 0) {
-        const hitMesh = hits[0].object;
+      const counterHit=hits.find(notOccluded);
+      if (counterHit) {
+        const hitMesh = counterHit.object;
         const foundCounter = counterMeshes.find(c => c.group.getObjectById(hitMesh.id));
         if (foundCounter && !foundCounter.data.stolen) {
           highlightAndNavigateToCounter(foundCounter.data);
@@ -1796,27 +1865,49 @@
       // Otherwise intersect ground plane to walk there
       const hitPt = new THREE.Vector3();
       if (raycaster.ray.intersectPlane(groundPlane, hitPt)) {
+        if(cameraMode==='first-person'&&(raycaster.ray.direction.y>-.035||raycaster.ray.origin.distanceTo(hitPt)>12||raycaster.ray.origin.distanceTo(hitPt)>nearestSolid+.18))return;
         const tx = Math.max(-18, Math.min(15, hitPt.x));
         const tz = Math.max(-8.8, Math.min(15.5, hitPt.z));
         navigateTo({x:tx,z:tz});
       }
+    }
+    renderer.domElement.addEventListener('pointerdown',e=>{
+      if(opening.active||gameState.status!=='PLAYING'||isPaused())return;
+      if(e.pointerType==='mouse'&&![0,1,2].includes(e.button))return;
+      SoundFX.init();e.preventDefault();
+      const rect=renderer.domElement.getBoundingClientRect(),touch=e.pointerType!=='mouse';
+      const rightDrag=!touch&&(e.button===2||e.button===1);
+      const canLook=rightDrag||(touch&&cameraMode==='first-person'&&e.clientX>=rect.left+rect.width*.45);
+      const look=canLook&&lookPointerId===null;
+      canvasPointers.set(e.pointerId,{startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,look,dragged:rightDrag,tap:!rightDrag});
+      if(look)lookPointerId=e.pointerId;
+      renderer.domElement.setPointerCapture(e.pointerId);
     });
-
-    window.addEventListener('pointermove', (e) => {
-      if (isDraggingCamera) {
-        const dx = e.clientX - dragStartX;
-        dragStartX = e.clientX;
-        camYawOffset -= dx * 0.005;
-        camYawOffset = Math.max(-0.65, Math.min(0.65, camYawOffset));
+    window.addEventListener('pointermove',e=>{
+      const gesture=canvasPointers.get(e.pointerId);if(!gesture)return;
+      if(opening.active||isPaused()||gameState.status!=='PLAYING'){finishCanvasPointer(e,false);return;}
+      if(!gesture.dragged&&Math.hypot(e.clientX-gesture.startX,e.clientY-gesture.startY)>8)gesture.dragged=true;
+      if(!gesture.dragged)return;
+      const dx=e.clientX-gesture.lastX,dy=e.clientY-gesture.lastY;
+      gesture.lastX=e.clientX;gesture.lastY=e.clientY;
+      if(gesture.look){
+        if(cameraMode==='first-person'){
+          fpYaw=Math.atan2(Math.sin(fpYaw-dx*.005),Math.cos(fpYaw-dx*.005));
+          fpPitch=Math.max(-1.05,Math.min(.82,fpPitch-dy*.004));
+        }else camYawOffset=Math.max(-.65,Math.min(.65,camYawOffset-dx*.005));
+        updateGameCamera(0);
       }
     });
-
-    window.addEventListener('pointerup', () => {
-      isDraggingCamera = false;
-    });
-
+    function finishCanvasPointer(e,allowTap){
+      const gesture=canvasPointers.get(e.pointerId);if(!gesture)return;
+      canvasPointers.delete(e.pointerId);if(lookPointerId===e.pointerId)lookPointerId=null;
+      if(renderer.domElement.hasPointerCapture(e.pointerId))renderer.domElement.releasePointerCapture(e.pointerId);
+      if(allowTap&&gesture.tap&&!gesture.dragged&&Math.hypot(e.clientX-gesture.startX,e.clientY-gesture.startY)<=8)pickWorld(e.clientX,e.clientY);
+    }
+    window.addEventListener('pointerup',e=>finishCanvasPointer(e,true));
+    window.addEventListener('pointercancel',e=>finishCanvasPointer(e,false));
+    renderer.domElement.addEventListener('lostpointercapture',e=>finishCanvasPointer(e,false));
     renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
-    window.addEventListener('pointercancel', clearInput);
     renderer.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); setPaused('graphics',true); manualPause(true); showToast('显卡画面暂时中断，正在等待恢复。',6000); });
     renderer.domElement.addEventListener('webglcontextrestored', () => { setPaused('graphics',false); manualPause(true); showToast('画面已恢复，点击继续行动。'); });
 
@@ -1834,7 +1925,7 @@
       return {
         x: (v.x * 0.5 + 0.5) * window.innerWidth,
         y: (-(v.y * 0.5) + 0.5) * window.innerHeight,
-        visible: v.z < 1
+        visible: v.z>=-1&&v.z<=1&&Math.abs(v.x)<=1&&Math.abs(v.y)<=1
       };
     }
 
@@ -1939,8 +2030,7 @@
         opening.update(dt);
         if(opening.active){renderer.render(opening.scene,opening.camera);return;}
       }
-
-
+      let cameraUpdated=false;
       if (gameState.status === 'PLAYING' && !isPaused()) {
         gameState.elapsedTime += dt;
         document.getElementById('timer-val').textContent = formatTime(gameState.elapsedTime);
@@ -1957,7 +2047,12 @@
 
         if (moveX !== 0 || moveZ !== 0) {
           player.targetDest = null; player.path = []; clickMarker.material.opacity = 0;
-          const direction = GameRules.screenMove(moveX,moveZ,DEFAULT_CAM_OFFSET.x,DEFAULT_CAM_OFFSET.z,camYawOffset);
+          let direction;
+          if(cameraMode==='first-person'){
+            const x=-Math.cos(fpYaw)*moveX-Math.sin(fpYaw)*moveZ;
+            const z=Math.sin(fpYaw)*moveX-Math.cos(fpYaw)*moveZ;
+            const length=Math.hypot(x,z)||1;direction={x:x/length,z:z/length};
+          }else direction=GameRules.screenMove(moveX,moveZ,DEFAULT_CAM_OFFSET.x,DEFAULT_CAM_OFFSET.z,camYawOffset);
           moveX=direction.x; moveZ=direction.z;
         } else if (player.path.length) {
           let next = player.path[0];
@@ -2041,7 +2136,9 @@
         }
 
         player.group.position.copy(player.pos);
+        if(cameraMode==='first-person')player.angle=fpYaw;
         player.bodyGroup.rotation.y = player.angle;
+        updateGameCamera(dt);cameraUpdated=true;
 
         // -------------------------------------------------------------------
         // B. UPDATE 4 SWEEPING SECURITY CAMERAS
@@ -2120,7 +2217,7 @@
               document.getElementById('tt-spec').textContent = item.spec;
               document.getElementById('tt-svg-holder').innerHTML = INMOAssets.conceptSVG();
             }
-          }
+          }else tooltipEl.classList.add('hidden');
         } else {
           tooltipEl.classList.add('hidden');
           quickStealBtn.classList.add('hidden');
@@ -2168,23 +2265,7 @@
         if (!document.getElementById('minimap-panel').classList.contains('collapsed') && now-lastMapFrame>90) { drawMinimap(); lastMapFrame=now; }
       }
 
-      // -------------------------------------------------------------------
-      // F. SMOOTH 45-DEGREE ISOMETRIC CAMERA FOLLOW
-      // -------------------------------------------------------------------
-      const targetFocusX = player.pos.x * (window.innerWidth < 700 ? .72 : .26);
-      const targetFocusZ = (player.pos.z - 1.0) * 0.16 - .3;
-      cameraTarget.x += (targetFocusX - cameraTarget.x) * Math.min(1, dt * 5);
-      cameraTarget.z += (targetFocusZ - cameraTarget.z) * Math.min(1, dt * 5);
-
-      const cosY = Math.cos(camYawOffset);
-      const sinY = Math.sin(camYawOffset);
-      const ox = DEFAULT_CAM_OFFSET.x * cosY - DEFAULT_CAM_OFFSET.z * sinY;
-      const oz = DEFAULT_CAM_OFFSET.x * sinY + DEFAULT_CAM_OFFSET.z * cosY;
-
-      const fitScale = Math.max(1, Math.min(1.8, 1.1 / camera.aspect));
-      camera.position.set(cameraTarget.x + ox*fitScale, DEFAULT_CAM_OFFSET.y*fitScale, cameraTarget.z + oz*fitScale);
-      camera.lookAt(cameraTarget);
-
+      if(!cameraUpdated)updateGameCamera(dt);
       renderer.render(scene, camera);
     }
 
@@ -2207,6 +2288,7 @@
     document.getElementById('btn-reset-cam').addEventListener('click', () => {
       resetCameraView();
     });
+    document.getElementById('btn-camera-mode').addEventListener('click',toggleCameraMode);
 
     document.getElementById('btn-audio-toggle').addEventListener('click', () => {
       toggleAudio();
