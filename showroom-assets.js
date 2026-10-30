@@ -30,7 +30,8 @@
       air3: {width:.73,height:.46,radius:.14,frame:0x151c23,lens:0x80aeb9,opacity:.30,arm:.15},
       go1:  {width:.66,height:.49,radius:.15,frame:0x26313e,lens:0xa2d3dd,opacity:.25,arm:.09},
       go2:  {width:.72,height:.44,radius:.09,frame:0x596973,lens:0xa3c9d3,opacity:.30,arm:.11},
-      go3:  {width:.70,height:.49,radius:.19,frame:0x19252b,lens:0xb2d1db,opacity:.25,arm:.10}
+      go3:  {width:.70,height:.49,radius:.19,frame:0x19252b,lens:0xb2d1db,opacity:.25,arm:.10},
+      launch:{width:.73,height:.46,radius:.13,frame:0xb3a28b,lens:0x82b9be,opacity:.40,arm:.12}
     }[code];
     const frameMat = new T.MeshPhysicalMaterial({color:params.frame,roughness:.29,metalness:.18,clearcoat:.6,clearcoatRoughness:.2,envMapIntensity:1.1});
     const armMat = new T.MeshPhysicalMaterial({color:code==='air1'?0x343b46:params.frame,roughness:.34,metalness:.22,clearcoat:.45,envMapIntensity:1.1});
@@ -142,5 +143,6 @@
     const shadow=contactShadow(T,5.6,3.3,.75);shadow.position.y=.015;car.add(shadow);
     return car;
   }
-  root.INMOAssets={products,createGlasses,createStudioEnvironment,linearizeScene,contactShadow,createCar};
+  function conceptSVG(){return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 110"><defs><linearGradient id="lens"><stop stop-color="#689b9d" stop-opacity=".65"/><stop offset="1" stop-color="#b5e7dd" stop-opacity=".12"/></linearGradient></defs><path d="M38 33L67 15M221 33L195 15" stroke="#a99a82" stroke-width="9" fill="none"/><path d="M24 34H110Q130 24 150 34H236" stroke="#c7b18c" stroke-width="9" fill="none"/><rect x="30" y="35" width="79" height="50" rx="15" fill="url(#lens)" stroke="#c2b191" stroke-width="7"/><rect x="151" y="35" width="79" height="50" rx="15" fill="url(#lens)" stroke="#c2b191" stroke-width="7"/><path d="M109 44Q130 36 151 44" stroke="#c2b191" stroke-width="6" fill="none"/><text x="130" y="106" text-anchor="middle" fill="#a8b8b4" font-size="10" font-family="sans-serif">GAME CONCEPT / 游戏概念造型</text></svg>`;}
+  root.INMOAssets={products,conceptSVG,createGlasses,createStudioEnvironment,linearizeScene,contactShadow,createCar};
 })(typeof window !== 'undefined' ? window : globalThis);

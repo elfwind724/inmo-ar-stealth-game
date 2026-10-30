@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>INMO 潜行行动 · 3D 展厅挑战</title>
+  <title>INMO 进入空间时代 · 新品发布会潜入</title>
   <meta name="theme-color" content="#101d2c">
-  <meta name="description" content="在45度俯视的INMO展厅中寻找监控盲区，完成六副AR眼镜的潜行挑战。">
+  <meta name="description" content="进入金橙色的INMO新品发布会，在广场演出、人群与巡场安保之间寻找机会，拿到神秘新品样机。">
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -217,11 +217,9 @@
   <link rel="stylesheet" href="./ui-polish.css">
   <script src="./game-rules.js"></script>
   <script src="./showroom-assets.js"></script>
-  <link rel="stylesheet" href="./police-chapter.css">
-  <link rel="stylesheet" href="./highway-chase.css">
-  <script src="./vendor/rapier.min.js" defer></script>
-  <script src="./highway-chase.js"></script>
-  <script src="./police-chapter.js"></script>
+  <script src="./launch-venue.js"></script>
+  <script src="./launch-tools.js"></script>
+  <link rel="stylesheet" href="./launch-event.css">
 </head>
 <body>
   <!-- 3D WebGL Viewport -->
@@ -236,8 +234,8 @@
       <div>
         <div class="mission-eyebrow">潜入目标</div>
         <div class="mission-title">
-          <h1>INMO 展厅</h1>
-          <span id="stolen-progress-badge" class="mono-font text-[10px] px-1.5 py-0.5 rounded bg-sky-950/90 border border-sky-500/40 text-sky-300">0/6</span>
+          <h1>新品发布会</h1>
+          <span id="stolen-progress-badge" class="mono-font text-[10px] px-1.5 py-0.5 rounded bg-sky-950/90 border border-sky-500/40 text-sky-300">0/1</span>
         </div>
       </div>
       <button id="btn-toggle-mission" class="mission-toggle" type="button" aria-expanded="false">清单</button>
@@ -248,8 +246,8 @@
     </div>
 
     <div class="mission-footer">
-      <span>躲开红光与店员视线</span>
-      <button class="text-sky-400 hover:underline" id="btn-price-info" type="button" title="查看六款眼镜的人民币参考价">价格参考</button>
+      <span>主舞台 · 神秘新品样机</span>
+      <button class="text-sky-400 hover:underline" id="btn-price-info" type="button" title="查看样机信息">样机信息</button>
     </div>
   </div>
 
@@ -273,7 +271,7 @@
   <div id="touch-dpad" aria-label="触屏移动">
     <button id="dpad-up" aria-label="向上">▲</button><button id="dpad-left" aria-label="向左">◀</button><button id="dpad-down" aria-label="向下">▼</button><button id="dpad-right" aria-label="向右">▶</button>
   </div>
-  <button id="btn-quick-steal" class="hidden">取走眼镜</button>
+  <button id="btn-quick-steal" class="hidden">取走样机</button>
   <div id="game-toast" role="status" aria-live="polite" class="hidden"></div>
 
   <!-- FLOATING 3D COUNTER PROXIMITY TOOLTIP CARD (Exact match to Image 1 & Image 2) -->
@@ -286,8 +284,8 @@
       <!-- Dynamic high-precision SVG of the specific INMO glasses -->
     </div>
     <div class="flex items-baseline justify-between mt-1">
-      <span id="tt-price" class="mono-font text-sm font-bold text-white">¥2,999</span>
-        <span class="mono-font text-[9px] text-slate-400">人民币参考价</span>
+      <span id="tt-price" class="mono-font text-sm font-bold text-white">待发布</span>
+        <span class="mono-font text-[9px] text-slate-400">新品信息</span>
     </div>
     <div id="tt-spec" class="text-[10px] text-slate-400 truncate mt-0.5">无线消费级真AR眼镜</div>
     <!-- Stealing Progress Bar (visible while stealing) -->
@@ -295,7 +293,7 @@
       <div id="tt-progress-bar" class="h-full bg-sky-400 transition-none" style="width: 0%;"></div>
     </div>
     <button id="tt-take-btn" class="mt-1.5 w-full text-left mono-font text-xs font-bold text-sky-400 hover:text-sky-300 flex items-center justify-between">
-      <span>取走眼镜 · 移动可中断</span>
+      <span>取走样机 · 移动可中断</span>
       <span class="px-1.5 py-0.2 bg-sky-950/90 border border-sky-500/40 rounded text-[10px]">E</span>
     </button>
   </div>
@@ -328,7 +326,7 @@
       </div>
 
       <div class="text-[11px] text-slate-400 mono-font border-t border-slate-800 pt-3 flex items-center justify-between">
-        <span>得分 = 已拿眼镜的人民币参考价 + 潜行奖励 · 本机记录</span>
+        <span>得分 = 样机目标积分 + 潜行与速度奖励 · 本机记录</span>
         <button id="btn-close-leaderboard-bottom" class="hud-btn px-3 py-1 text-xs">返回游戏</button>
       </div>
     </div>
@@ -339,8 +337,8 @@
     <div class="hud-panel w-full max-w-2xl p-5 border-sky-400/50 max-h-[88vh] flex flex-col">
       <div class="flex items-center justify-between pb-3 border-b border-slate-700/80">
         <div>
-          <h2 id="catalog-title" class="mono-font text-base sm:text-lg font-extrabold text-sky-300">六款 INMO 眼镜 · 人民币参考价</h2>
-          <p class="text-xs text-slate-400 mt-0.5">点击型号可导航到对应柜台；价格按中国市场公开发布价或指导价整理</p>
+          <h2 id="catalog-title" class="mono-font text-base sm:text-lg font-extrabold text-sky-300">发布会行动档案</h2>
+          <p class="text-xs text-slate-400 mt-0.5">11.04 · 智能眼镜进入空间时代</p>
         </div>
         <button id="btn-close-catalog" class="text-slate-400 hover:text-white text-lg font-bold px-2" aria-label="关闭价格参考">✕</button>
       </div>
@@ -371,12 +369,12 @@
 
       <div class="my-4 p-3.5 rounded-lg bg-slate-900/90 border border-slate-800 mono-font text-xs space-y-1.5 text-left">
         <div class="flex justify-between">
-          <span class="text-slate-400">已顺走 AR 眼镜:</span>
-          <span id="end-stolen-count" class="text-sky-300 font-bold">0 / 6 台</span>
+          <span class="text-slate-400">已拿到样机:</span>
+          <span id="end-stolen-count" class="text-sky-300 font-bold">0 / 1 副</span>
         </div>
         <div class="flex justify-between">
-          <span class="text-slate-400">眼镜参考总价:</span>
-          <span id="end-loot-value" class="text-emerald-400 font-bold">¥0</span>
+          <span class="text-slate-400">新品状态:</span>
+          <span id="end-loot-value" class="text-emerald-400 font-bold">尚未取回</span>
         </div>
         <div class="flex justify-between">
           <span class="text-slate-400">行动耗时:</span>
@@ -405,7 +403,6 @@
         <button id="btn-play-again" class="hud-btn flex-1 py-2.5 text-sm mono-font font-bold bg-sky-600/30 border-sky-400 text-white">
           重来
         </button>
-        <button id="btn-continue-story" class="hud-btn flex-1 py-2.5 text-sm mono-font font-bold hidden">继续 →</button>
         <button id="btn-end-leaderboard" class="hud-btn px-4 py-2.5 text-sm mono-font">
           📊 排行榜
         </button>
@@ -413,68 +410,17 @@
     </div>
   </div>
 
-  <section id="chapter-hud" hidden aria-label="警局突围">
-    <div class="chapter-heading"><div id="chapter-kicker">第二章</div><h2 id="chapter-caption"></h2><p id="chapter-hint"></p></div>
-    <button id="chapter-pause-button" class="hud-btn" aria-label="暂停警局章节">暂停 / 帮助</button>
-    <div id="chapter-combat-ui" hidden>
-      <div class="chapter-health-head"><span>体力</span><strong id="chapter-health-value">120 / 120</strong></div>
-      <div class="chapter-meter" role="img" aria-label="玩家体力"><div id="chapter-health-fill"></div></div>
-      <div class="chapter-progress"><span>警卫 <strong id="chapter-enemy-count">0 / 7</strong></span><span id="chapter-key">牢门已锁</span></div>
-      <div id="chapter-boss-status">Boss 待登场</div>
-      <div id="chapter-squad"></div>
-    </div>
-    <div id="chapter-target" hidden><strong id="chapter-target-name"></strong><div class="chapter-meter"><div id="chapter-target-fill"></div></div></div>
-    <button id="chapter-cell-action" class="chapter-action" hidden>打晕警察 · 拿钥匙</button>
-    <button id="chapter-dodge" class="chapter-action" hidden>闪避 · 空格</button>
-    <button id="chapter-auto-attack" class="chapter-action" hidden>迎战最近敌人 · F</button>
-    <div id="chapter-combo" hidden></div>
-  </section>
-  <div id="chapter-impact"></div>
-  <div id="chapter-speech" hidden>吃饭吧，垃圾小偷</div>
-  <div id="chapter-transition" hidden><div id="chapter-transition-title"></div><div id="chapter-transition-subtitle"></div></div>
-  <div id="chapter-pause" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chapter-pause-title" hidden>
-    <div class="chapter-dialog-card"><div class="chapter-dialog-kicker">CHAPTER 02 / PAUSED</div><h2 id="chapter-pause-title">故事暂停在这里</h2>
-      <p>点击敌人或按 F 迎战，自动追近并使用刺拳、直拳、摆拳、回旋踢；击倒后继续迎战附近敌人。点击地面可取消追击，WASD 可走位；空格或 Shift 闪避。被击中会硬直，无法继续出招。</p>
-      <p>出牢门后会有 2～3 名警卫围攻。警棍举起时准备闪避；Boss 还会冲刺、横扫，连续命中能破防。打赢后进入第三章警车追逐。鼠标滚轮不会缩放。</p>
-      <div class="chapter-dialog-actions"><button id="chapter-resume" class="primary-action">继续</button><button id="chapter-restart" class="hud-btn">重回展厅</button></div>
-    </div>
-  </div>
-  <div id="chapter-result" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chapter-result-title" hidden>
-    <div class="chapter-dialog-card"><div id="chapter-result-kicker" class="chapter-dialog-kicker"></div><h2 id="chapter-result-title"></h2>
-      <p id="chapter-result-copy"></p><div id="chapter-result-stats"></div>
-      <div class="chapter-dialog-actions"><button id="chapter-retry" class="primary-action">重试警局</button><button id="chapter-next-chase" class="primary-action" hidden>开走警车 →</button><button id="chapter-result-restart" class="hud-btn">重回展厅</button></div>
-    </div>
-  </div>
-
-  <section id="chase-hud" aria-label="第三章警车追逐" hidden>
-    <div class="chase-objective"><span>CHAPTER 03 / NIGHT RUN</span><h2>再借一辆警车</h2><p>坚持两分钟，甩掉追捕。</p><div class="chase-progress-track"><div id="chase-progress"></div></div></div>
-    <div class="chase-clock"><small>距离逃脱</small><strong id="chase-time">02:00</strong><button id="chase-pause-button" class="hud-btn">暂停 / 帮助</button></div>
-    <div class="chase-speedometer"><strong id="chase-speed">110</strong><span>km/h</span><p id="chase-clean">无碰撞 · 自动提速</p></div>
-    <div id="chase-warning" role="status" hidden></div><div id="chase-stop-warning" hidden>正在被逼停！转向摆脱夹击</div>
-    <div class="chase-driving-controls"><button id="chase-left" aria-label="车辆左转">◀</button><button id="chase-brake" aria-label="车辆刹车">刹车</button><button id="chase-right" aria-label="车辆右转">▶</button></div>
-    <div class="chase-actions"><button id="chase-rear-view" class="hud-btn">看后方 · C</button><button id="chase-brake-ram" class="primary-action">急刹反撞 · 空格</button></div>
-    <div class="chase-control-hint">A / D 转向 · S 刹车 · 空格急刹反撞 · 无碰撞自动提速</div>
-    <div id="chase-speed-lines"></div><div id="chase-damage-flash"></div>
-    <div id="chase-loading">第三章 · 警笛从身后响起<span>正在准备车辆场景…</span></div>
-  </section>
-  <div id="chase-roof" hidden><div class="chase-roof-head"><span>车辆耐久</span><strong id="chase-durability-value">100%</strong></div><div class="chase-roof-track"><div id="chase-durability-fill"></div></div></div>
-  <div id="chase-pause" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chase-pause-title" hidden>
-    <div class="chapter-dialog-card"><div class="chapter-dialog-kicker">CHAPTER 03 / PAUSED</div><h2 id="chase-pause-title">警笛先停一会儿</h2><p>坚持 120 秒即可逃脱。玩家最高 230 km/h，追击警车最高 190 km/h；无碰撞会自动加速，碰撞会掉耐久并减速。</p><p>A / D 或方向键左右转向，S 刹车，空格急刹反撞后方警车，C 切换后视。触屏可用底部按钮。耐久归零或被撞停连续 3 秒会失败，可直接重试追逐。</p><div class="chapter-dialog-actions"><button id="chase-resume" class="primary-action">继续驾驶</button><button id="chase-pause-return" class="hud-btn">重回展厅</button></div></div>
-  </div>
-  <div id="chase-result" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chase-result-title" hidden>
-    <div class="chapter-dialog-card"><div id="chase-result-kicker" class="chapter-dialog-kicker"></div><h2 id="chase-result-title"></h2><p id="chase-result-copy"></p><div id="chase-result-stats"></div><div class="chapter-dialog-actions"><button id="chase-retry" class="primary-action">再跑一次</button><button id="chase-return" class="hud-btn">重回展厅</button></div></div>
-  </div>
-  <div id="chase-entry" class="chapter-dialog" role="dialog" aria-modal="true" aria-labelledby="chase-entry-title" hidden>
-    <div class="chapter-dialog-card"><div class="chapter-dialog-kicker">CHAPTER 03 / FREE DRIVE</div><h2 id="chase-entry-title">夜间追逐 · 独立试玩</h2><p>这辆警车暂时归你了。坚持两分钟，别让后面的警车把你撞停。无碰撞会自动提速，车顶显示耐久。</p><p>A / D 转向，S 刹车，空格急刹反撞，C 看后方。完整故事中，击败典狱长后会自动进入这一章。</p><div class="chapter-dialog-actions"><button id="chase-entry-start" class="primary-action">开始驾驶</button><button id="chase-entry-back" class="hud-btn">从展厅开始</button></div></div>
-  </div>
+  <div id="launch-bubbles" aria-hidden="true"></div>
+  <div id="launch-event-tag">11.04 · 影目新品发布会</div>
+  <div id="launch-kit" class="hud-panel"></div>
 
   <div id="modal-pause" class="game-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
     <div class="dialog-card">
       <div class="dialog-kicker">INMO / STEALTH OPERATION</div>
       <h2 id="pause-title">行动已暂停</h2>
-      <p>拿齐六副眼镜即可通关。只有取镜时被看见才会被抓；红光是摄像头，黄光是店员视线。店员低头看手机时，黄色视线会消失。</p>
-      <div class="controls-grid"><div>屏幕方向移动 <kbd>WASD / ↑↓←→</kbd></div><div>取走眼镜 <kbd>E / 空格</kbd></div><div>慢走蹲姿 <kbd>Shift / C</kbd></div><div>暂停 / 继续 <kbd>Esc / P</kbd></div><div>重置视角 <kbd>V</kbd></div><div>重新开始 <kbd>R</kbd></div></div>
-      <p>点击柜台可绕开障碍走近；抵达后再选择取镜。移动会中断取镜。鼠标滚轮不缩放。</p>
+      <p>目标是店内主舞台的神秘新品样机。正常走动安全，取镜时被镜头或人群看到就结束本局，只能重新来。</p>
+      <div class="controls-grid"><div>屏幕方向移动 <kbd>WASD / ↑↓←→</kbd></div><div>取走样机 <kbd>E / 空格</kbd></div><div>慢走蹲姿 <kbd>Shift / C</kbd></div><div>暂停 / 继续 <kbd>Esc / P</kbd></div><div>重置视角 <kbd>V</kbd></div><div>重新开始 <kbd>R</kbd></div></div>
+      <p>点击展台走近后按 E，或使用伸缩钩远距离回收。饮料、服务员和舞台应援能制造空窗；移动会中断回收，鼠标滚轮不缩放。</p>
       <div class="settings-row"><button id="btn-crouch-toggle" class="hud-btn"><span id="crouch-btn-label">站立行走</span></button><button id="btn-reset-cam" class="hud-btn">45° 视角</button><button id="btn-audio-toggle" class="hud-btn"><span id="audio-btn-label">音效开启</span></button></div>
       <div class="dialog-actions"><button id="btn-resume" class="primary-action">继续行动</button><button id="btn-restart-quick" class="hud-btn">重新开始</button></div>
     </div>
@@ -495,92 +441,10 @@
     // =========================================================================
     // 1. INMO model data. Prices are published China-market list or launch prices.
     // =========================================================================
-    const GLASSES_DATA = [
-      {
-        id: 1,
-        counterNum: 1,
-        code: 'air1',
-        name: 'INMO Air1',
-        displayPrice: '¥2,999',
-        priceRmb: 2999,
-        priceType: '公开售价',
-        priceSource: 'https://www.leiphone.com/category/industrynews/0d1ucsnmAHQrTqtO.html',
-        scorePoints: 2999,
-        spec: '初代无线消费级真AR眼镜 · 垂直阵列光波导 · 侧边双蓝光指示灯',
-        pos: { x: -8.2, z: -4.2 }, // Top-Left Counter #1
-        stolen: false
-      },
-      {
-        id: 2,
-        counterNum: 2,
-        code: 'air2',
-        name: 'INMO Air2',
-        displayPrice: '¥3,999',
-        priceRmb: 3999,
-        priceType: '官方零售价',
-        priceSource: 'https://www.paoka.com/product/INMO-Air2',
-        scorePoints: 3999,
-        spec: '双目全彩无线 AR 眼镜 · 哑光黑框 · 粗镜腿与前置传感器',
-        pos: { x: 0.0, z: -4.2 }, // Top-Middle Counter #2
-        stolen: false
-      },
-      {
-        id: 3,
-        counterNum: 3,
-        code: 'air3',
-        name: 'INMO Air3',
-        displayPrice: '¥4,999',
-        priceRmb: 4999,
-        priceType: '公开指导价',
-        priceSource: 'https://news.43y.com.cn/n/9337.html',
-        scorePoints: 4999,
-        spec: '1080P 全彩波导 AR 眼镜 · 黑色镜框 · 中置相机',
-        pos: { x: 8.2, z: -4.2 }, // Top-Right Counter #3
-        stolen: false
-      },
-      {
-        id: 4,
-        counterNum: 4,
-        code: 'go1',
-        name: 'INMO Go1',
-        displayPrice: '¥1,999',
-        priceRmb: 1999,
-        priceType: '官方指导价',
-        priceSource: 'https://www.jiemian.com/article/10053458.html',
-        scorePoints: 1999,
-        spec: '轻量化 AI 实时翻译 AR 眼镜 · 经典黑框与智能镜腿',
-        pos: { x: -5.4, z: 2.3 }, // Bottom-Left Counter #4
-        stolen: false
-      },
-      {
-        id: 5,
-        counterNum: 5,
-        code: 'go2',
-        name: 'INMO GO2',
-        displayPrice: '¥3,999',
-        priceRmb: 3999,
-        priceType: '公开定价',
-        priceSource: 'https://news.43y.com.cn/n/9337.html',
-        scorePoints: 3999,
-        spec: '双目波导翻译 AR 眼镜 · 石墨灰镜框与智能镜腿',
-        pos: { x: 2.2, z: 2.3 }, // Bottom-Middle Counter #5
-        stolen: false
-      },
-      {
-        id: 6,
-        counterNum: 6,
-        code: 'go3',
-        name: 'INMO GO3',
-        displayPrice: '¥2,999',
-        priceRmb: 2999,
-        priceType: '首发价',
-        priceSource: 'https://finance.sina.com.cn/tech/roll/2025-10-17/doc-infucfic2266513.shtml',
-        scorePoints: 2999,
-        spec: '新一代双目 AI 翻译眼镜 · 轻量黑框与前置相机',
-        pos: { x: 9.6, z: 2.3 }, // Bottom-Right Counter #6
-        stolen: false
-      }
-    ];
+    // The poster supplies the event theme/date, not a product model or retail price.
+    const GLASSES_DATA = [{ id:1,counterNum:1,code:'launch',name:'INMO 神秘新品',
+      displayPrice:'待发布',priceRmb:0,priceType:'发布会样机',priceSource:null,scorePoints:5000,
+      spec:'游戏概念造型 · 非官方外观，型号与价格待发布',pos:{x:0,z:-5.8},stolen:false }];
 
     // Custom high-detail SVG illustrations matching Image 3 for each of the 6 models
     function getGlassesSVG(code) {
@@ -724,7 +588,7 @@
 
     let leaderboardData = [...DEFAULT_LEADERBOARD];
     try {
-      const saved = localStorage.getItem('inmo_stealth_leaderboard_v2');
+      const saved = localStorage.getItem('inmo_launch_leaderboard_v1');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) leaderboardData = parsed.filter(x=>x && typeof x.name==='string' && Number.isFinite(x.score) && x.score>=0 && x.score<1000000).map(x=>({...x,name:x.name.slice(0,16),note:String(x.note||'').slice(0,60)})).sort((a,b)=>b.score-a.score).slice(0,10);
@@ -733,7 +597,7 @@
 
     function saveLeaderboard() {
       try {
-        localStorage.setItem('inmo_stealth_leaderboard_v2', JSON.stringify(leaderboardData));
+        localStorage.setItem('inmo_launch_leaderboard_v1', JSON.stringify(leaderboardData));
         return true;
       } catch (e) { return false; }
     }
@@ -776,8 +640,8 @@
     scene.fog = new THREE.FogExp2(new THREE.Color(0x101925).convertSRGBToLinear(), 0.003);
 
     // Orthographic-like 45-degree Isometric Perspective Camera
-    const camera = new THREE.PerspectiveCamera(33, window.innerWidth / window.innerHeight, 0.5, 160);
-    const DEFAULT_CAM_OFFSET = new THREE.Vector3(-16, 28, 23);
+    const camera = new THREE.PerspectiveCamera(36, window.innerWidth / window.innerHeight, 0.5, 160);
+    const DEFAULT_CAM_OFFSET = new THREE.Vector3(-19, 33, 27);
     let camYawOffset = 0.0;
     const cameraTarget = new THREE.Vector3(0, 0.5, 1.5);
 
@@ -860,503 +724,11 @@
     // -------------------------------------------------------------------------
     // BUILD ENVIRONMENT: STREET, SIDEWALK, ROAD, TREE, BENCH, CAR, STOREFRONT
     // -------------------------------------------------------------------------
+    let launchVenue;
     function buildEnvironment() {
-      const envGroup = new THREE.Group();
-
-      // 1. Showroom Tiled Floor (X: -14..14, Z: -10..6)
-      const floorTex = makeTextTexture({
-        width: 512, height: 512, bg: '#344450',
-        drawFn(ctx, w, h) {
-          ctx.strokeStyle = '#4b5a64';
-          ctx.lineWidth = 2;
-          const step = 128;
-          for (let i = 0; i <= w; i += step) {
-            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke();
-          }
-        }
-      });
-      floorTex.wrapS = THREE.RepeatWrapping;
-      floorTex.wrapT = THREE.RepeatWrapping;
-      floorTex.repeat.set(7, 4);
-
-      const storeFloor = new THREE.Mesh(
-        new THREE.PlaneGeometry(28, 16),
-        new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.47, metalness: 0.18, envMapIntensity: 0.4 })
-      );
-      storeFloor.rotation.x = -Math.PI / 2;
-      storeFloor.position.set(0, 0.01, -2);
-      storeFloor.receiveShadow = true;
-      envGroup.add(storeFloor);
-
-      // 2. Sidewalk outside (Front Z: 6..12.8 & Left X: -22..-14)
-      const sidewalkTex = makeTextTexture({
-        width: 512, height: 512, bg: '#293847',
-        drawFn(ctx, w, h) {
-          ctx.strokeStyle = '#394b59';
-          ctx.lineWidth = 3;
-          const step = 128;
-          for (let i = 0; i <= w; i += step) {
-            ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke();
-          }
-        }
-      });
-      sidewalkTex.wrapS = THREE.RepeatWrapping;
-      sidewalkTex.wrapT = THREE.RepeatWrapping;
-      sidewalkTex.repeat.set(8, 5);
-
-      const sidewalkMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(44, 30),
-        new THREE.MeshStandardMaterial({ map: sidewalkTex, roughness: 0.8 })
-      );
-      sidewalkMesh.rotation.x = -Math.PI / 2;
-      sidewalkMesh.position.set(-2, -0.02, 2);
-      sidewalkMesh.receiveShadow = true;
-      envGroup.add(sidewalkMesh);
-
-      // 3. Asphalt Street Road (Z: 12.2..24) + Yellow Curb + White Crosswalk Stripes
-      const roadMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(50, 14),
-        new THREE.MeshStandardMaterial({ color: 0x26292e, roughness: 0.85 })
-      );
-      roadMesh.rotation.x = -Math.PI / 2;
-      roadMesh.position.set(0, -0.06, 19.0);
-      roadMesh.receiveShadow = true;
-      envGroup.add(roadMesh);
-
-      // Yellow double line along the curb
-      const yellowLine = new THREE.Mesh(
-        new THREE.PlaneGeometry(46, 0.22),
-        new THREE.MeshBasicMaterial({ color: 0xd99b26 })
-      );
-      yellowLine.rotation.x = -Math.PI / 2;
-      yellowLine.position.set(0, -0.03, 12.6);
-      envGroup.add(yellowLine);
-
-      // Crosswalk Zebra Stripes (matching bottom-left of Image 1)
-      for (let i = 0; i < 5; i++) {
-        const stripe = new THREE.Mesh(
-          new THREE.PlaneGeometry(1.1, 3.8),
-          new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.6 })
-        );
-        stripe.rotation.x = -Math.PI / 2;
-        stripe.position.set(-9.5 + i * 1.85, -0.03, 15.2);
-        envGroup.add(stripe);
-      }
-
-      // Manhole cover on sidewalk
-      const manhole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.85, 0.85, 0.04, 24),
-        new THREE.MeshStandardMaterial({ color: 0x3b4046, roughness: 0.7, metalness: 0.4 })
-      );
-      manhole.position.set(-5.8, 0.01, 9.2);
-      envGroup.add(manhole);
-
-      // Entrance Floor Mat ("SEE A BRIGHTER REALITY")
-      const matTex = makeTextTexture({
-        width: 512, height: 256, bg: '#383b40',
-        drawFn(ctx, w, h) {
-          ctx.strokeStyle = '#52565e';
-          ctx.lineWidth = 8;
-          ctx.strokeRect(8, 8, w - 16, h - 16);
-          ctx.fillStyle = '#cbd5e1';
-          ctx.font = 'bold 34px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('SEE A BRIGHTER', w / 2, h / 2 - 10);
-          ctx.fillText('REALITY', w / 2, h / 2 + 34);
-        }
-      });
-      const floorMat = new THREE.Mesh(
-        new THREE.PlaneGeometry(3.4, 2.0),
-        new THREE.MeshStandardMaterial({ map: matTex, roughness: 0.9 })
-      );
-      floorMat.rotation.x = -Math.PI / 2;
-      floorMat.position.set(-1.0, 0.025, 5.2);
-      envGroup.add(floorMat);
-
-      // 4. Cutaway Store Walls (Back Wall Z=-10, Left Wall X=-14, Right Wall X=14)
-      const wallMatLight = new THREE.MeshStandardMaterial({ color: 0x3c4b58, roughness: 0.82 });
-      const wallMatDark = new THREE.MeshStandardMaterial({ color: 0x14232e, roughness: 0.7 });
-
-      // Back Wall Left & Right light segments
-      const backWallL = new THREE.Mesh(new THREE.BoxGeometry(8, 7.2, 0.45), wallMatLight);
-      backWallL.position.set(-10, 3.6, -10);
-      backWallL.castShadow = true;
-      backWallL.receiveShadow = true;
-      envGroup.add(backWallL);
-
-      const backWallR = new THREE.Mesh(new THREE.BoxGeometry(8, 7.2, 0.45), wallMatLight);
-      backWallR.position.set(10, 3.6, -10);
-      backWallR.castShadow = true;
-      backWallR.receiveShadow = true;
-      envGroup.add(backWallR);
-
-      // Back Wall Center Dark Feature Wall with glowing "INMO / SEE A BRIGHTER REALITY"
-      const backCenterTex = makeTextTexture({
-        width: 1024, height: 512, bg: '#1e2228',
-        drawFn(ctx, w, h) {
-          ctx.shadowColor = 'rgba(186, 230, 253, 0.85)';
-          ctx.shadowBlur = 28;
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '900 150px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('INMO', w / 2, 235);
-          ctx.shadowBlur = 0;
-          ctx.fillStyle = '#cbd5e1';
-          ctx.font = '600 34px Inter, sans-serif';
-          ctx.letterSpacing = '8px';
-          ctx.fillText('SEE A BRIGHTER REALITY', w / 2, 305);
-        }
-      });
-      const backWallCenter = new THREE.Mesh(
-        new THREE.BoxGeometry(12.2, 7.4, 0.55),
-        new THREE.MeshStandardMaterial({ map: backCenterTex, roughness: 0.4 })
-      );
-      backWallCenter.position.set(0, 3.7, -9.95);
-      backWallCenter.castShadow = true;
-      envGroup.add(backWallCenter);
-
-      // Left Wall (X = -14) with "INMO / GLASSES PEOPLE MORE" typography
-      const leftWallTex = makeTextTexture({
-        width: 1024, height: 512, bg: '#34434e',
-        drawFn(ctx, w, h) {
-          ctx.fillStyle = '#c7dce5';
-          ctx.font = '900 72px Inter, sans-serif';
-          ctx.fillText('INMO', 140, 200);
-          ctx.font = '500 34px Inter, sans-serif';
-          ctx.fillStyle = '#91abb9';
-          ctx.fillText('GLASSES', 140, 275);
-          ctx.fillText('PEOPLE', 140, 320);
-          ctx.fillText('MORE', 140, 365);
-        }
-      });
-      const leftWall = new THREE.Mesh(
-        new THREE.BoxGeometry(0.45, 7.2, 16.4),
-        new THREE.MeshStandardMaterial({ map: leftWallTex, roughness: 0.6 })
-      );
-      leftWall.position.set(-14, 3.6, -2);
-      leftWall.castShadow = true;
-      leftWall.receiveShadow = true;
-      envGroup.add(leftWall);
-
-      // Right Wall (X = 14) with "AR FOR A BRIGHTER TOMORROW" + Mountain Lightbox Poster
-      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.45, 7.2, 16.4), wallMatLight);
-      rightWall.position.set(14, 3.6, -2);
-      rightWall.castShadow = true;
-      rightWall.receiveShadow = true;
-      envGroup.add(rightWall);
-
-      // Right Wall Typography Panel ("AR FOR A BRIGHTER TOMORROW")
-      const rightTextTex = makeTextTexture({
-        width: 512, height: 512, bg: '#bcc1c7',
-        drawFn(ctx, w, h) {
-          ctx.fillStyle = '#334155';
-          ctx.font = '700 44px Inter, sans-serif';
-          ctx.fillText('AR', 60, 140);
-          ctx.fillText('FOR A', 60, 200);
-          ctx.fillText('BRIGHTER', 60, 260);
-          ctx.fillText('TOMORROW', 60, 320);
-        }
-      });
-      const rightTextPanel = new THREE.Mesh(
-        new THREE.PlaneGeometry(4.5, 4.8),
-        new THREE.MeshStandardMaterial({ map: rightTextTex, roughness: 0.65 })
-      );
-      rightTextPanel.rotation.y = -Math.PI / 2;
-      rightTextPanel.position.set(13.75, 3.4, -5.2);
-      envGroup.add(rightTextPanel);
-
-      // Right Wall Backlit Mountain Poster ("THINK SEE BE MORE")
-      const posterTex = makeTextTexture({
-        width: 512, height: 768, bg: '#e2e8f0',
-        drawFn(ctx, w, h) {
-          const grad = ctx.createLinearGradient(0, 0, 0, h);
-          grad.addColorStop(0, '#f8fafc');
-          grad.addColorStop(0.55, '#cbd5e1');
-          grad.addColorStop(1, '#475569');
-          ctx.fillStyle = grad;
-          ctx.fillRect(20, 20, w - 40, h - 40);
-          // Stylized mountain peaks
-          ctx.fillStyle = '#64748b';
-          ctx.beginPath();
-          ctx.moveTo(20, 620); ctx.lineTo(180, 410); ctx.lineTo(340, 620); ctx.closePath();
-          ctx.fill();
-          ctx.fillStyle = '#334155';
-          ctx.beginPath();
-          ctx.moveTo(160, 620); ctx.lineTo(350, 380); ctx.lineTo(492, 620); ctx.closePath();
-          ctx.fill();
-          ctx.fillStyle = '#1e293b';
-          ctx.font = '700 42px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('THINK', w / 2, 165);
-          ctx.fillText('SEE', w / 2, 220);
-          ctx.fillText('BE MORE', w / 2, 275);
-        }
-      });
-      const posterFrame = new THREE.Mesh(
-        new THREE.BoxGeometry(0.18, 4.8, 3.1),
-        new THREE.MeshBasicMaterial({ map: posterTex })
-      );
-      posterFrame.position.set(13.7, 3.4, 0.2);
-      envGroup.add(posterFrame);
-
-      // 5. Reception / Cashier Counter in front of Back Wall (X: -0.2, Z: -7.6)
-      const recGroup = new THREE.Group();
-      recGroup.position.set(-0.2, 0, -7.6);
-      const recBody = new THREE.Mesh(
-        new THREE.BoxGeometry(7.6, 1.35, 1.6),
-        new THREE.MeshStandardMaterial({ color: 0x283a47, roughness: 0.4, metalness: .22 })
-      );
-      recBody.position.y = 0.68;
-      recBody.castShadow = true;
-      recBody.receiveShadow = true;
-      recGroup.add(recBody);
-      // Glowing blue LED base under reception counter
-      const recLed = new THREE.Mesh(
-        new THREE.BoxGeometry(7.66, 0.08, 1.66),
-        new THREE.MeshBasicMaterial({ color: 0x60a5fa })
-      );
-      recLed.position.y = 0.04;
-      recGroup.add(recLed);
-      // Monitor on reception desk
-      const monScreen = new THREE.Mesh(
-        new THREE.BoxGeometry(1.1, 0.65, 0.08),
-        new THREE.MeshStandardMaterial({ color: 0x1e293b })
-      );
-      monScreen.position.set(0.3, 1.72, 0);
-      recGroup.add(monScreen);
-      const monStand = new THREE.Mesh(
-        new THREE.BoxGeometry(0.16, 0.35, 0.16),
-        new THREE.MeshStandardMaterial({ color: 0x475569 })
-      );
-      monStand.position.set(0.3, 1.45, 0);
-      recGroup.add(monStand);
-      envGroup.add(recGroup);
-      const receptionShadow=INMOAssets.contactShadow(THREE,8.9,3.2,.58);receptionShadow.position.set(-.2,.026,-7.6);envGroup.add(receptionShadow);
-      const backLight = new THREE.Mesh(new THREE.BoxGeometry(26.8,.055,.08),new THREE.MeshBasicMaterial({color:0x9edcf0,toneMapped:false}));
-      backLight.position.set(0,6.72,-9.62);envGroup.add(backLight);
-      for(const x of [-13.65,13.65]){
-        const wallLight=new THREE.Mesh(new THREE.BoxGeometry(.045,5.6,.045),new THREE.MeshBasicMaterial({color:0xe6bd8d,toneMapped:false}));
-        wallLight.position.set(x,3.2,-8.9);envGroup.add(wallLight);
-      }
-      addBoxCollider(-0.2, -7.6, 8.0, 2.0);
-
-      // Wall Shelves on Left Wall & Right Back
-      function makeShelf(x, z, rotY) {
-        const sg = new THREE.Group();
-        sg.position.set(x, 0, z);
-        sg.rotation.y = rotY;
-        const frame = new THREE.Mesh(
-          new THREE.BoxGeometry(1.8, 3.8, 0.65),
-          new THREE.MeshStandardMaterial({ color: 0x333840, roughness: 0.6 })
-        );
-        frame.position.y = 1.9;
-        frame.castShadow = true;
-        sg.add(frame);
-        for (let r = 0; r < 4; r++) {
-          for (let c = 0; c < 2; c++) {
-            const box = new THREE.Mesh(
-              new THREE.BoxGeometry(0.45, 0.35, 0.35),
-              new THREE.MeshStandardMaterial({ color: 0xf1f5f9 })
-            );
-            box.position.set(-0.38 + c * 0.76, 0.75 + r * 0.82, 0.12);
-            sg.add(box);
-          }
-        }
-        envGroup.add(sg);
-      }
-      makeShelf(-13.3, -6.2, Math.PI / 2);
-      makeShelf(-13.3, 2.2, Math.PI / 2);
-      makeShelf(6.5, -9.3, 0);
-
-      // Potted Plants inside store
-      function makePlant(x, z) {
-        const pg = new THREE.Group();
-        pg.position.set(x, 0, z);
-        const pot = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.38, 0.28, 0.7, 12),
-          new THREE.MeshStandardMaterial({ color: 0x9ca3af })
-        );
-        pot.position.y = 0.35;
-        pg.add(pot);
-        const leaves = new THREE.Mesh(
-          new THREE.DodecahedronGeometry(0.65, 0),
-          new THREE.MeshStandardMaterial({ color: 0x4d7c0f, flatShading: true })
-        );
-        leaves.position.y = 1.1;
-        leaves.castShadow = true;
-        pg.add(leaves);
-        envGroup.add(pg);
-      }
-      makePlant(12.6, -2.5);
-      makePlant(-10.5, 4.7);
-
-      // 6. Cutaway Front Glass Storefront Wall (Z = 6.0) with Entrance Doorway & Glowing "INMO" Sign
-      const pillarMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.7 });
-      const mullionMat = new THREE.MeshStandardMaterial({ color: 0x262b33, roughness: 0.4, metalness: 0.5 });
-      const glassMat = new THREE.MeshStandardMaterial({
-        color: 0x93c5fd,
-        transparent: true,
-        opacity: 0.035,
-        depthWrite: false,
-        roughness: 0.1,
-        metalness: 0.2
-      });
-
-      // Door Pillars at X = -3.1 and X = 1.1
-      [-14.0, -3.1, 1.1, 14.0].forEach(px => {
-        const height = Math.abs(px)>10 ? 1.0 : 2.6;
-        const pil = new THREE.Mesh(new THREE.BoxGeometry(0.45, height, 0.45), pillarMat);
-        pil.position.set(px, height/2, 6.0);
-        pil.castShadow = true;
-        envGroup.add(pil);
-      });
-
-      // Left Storefront Glass Panel (X: -13.6 to -3.5)
-      const leftGlass = new THREE.Mesh(new THREE.BoxGeometry(10.1, .55, 0.08), glassMat);
-      leftGlass.position.set(-8.55, .3, 6.0);
-      envGroup.add(leftGlass);
-      // Top beam left
-      const beamL = new THREE.Mesh(new THREE.BoxGeometry(10.9, 0.32, 0.35), mullionMat);
-      beamL.position.set(-8.55, .32, 6.0);
-      envGroup.add(beamL);
-      addBoxCollider(-8.55, 6.0, 10.5, 0.75);
-
-      // Right Storefront Glass Panel (X: 1.5 to 13.6)
-      const rightGlass = new THREE.Mesh(new THREE.BoxGeometry(12.1, .55, 0.08), glassMat);
-      rightGlass.position.set(7.55, .3, 6.0);
-      envGroup.add(rightGlass);
-      const beamR = new THREE.Mesh(new THREE.BoxGeometry(12.9, 0.32, 0.35), mullionMat);
-      beamR.position.set(7.55, .32, 6.0);
-      envGroup.add(beamR);
-      addBoxCollider(7.55, 6.0, 12.5, 0.75);
-
-      // Glowing "INMO" Sign Box above Front Door (X = -1.0, Y = 4.0, Z = 6.0)
-      const doorSignTex = makeTextTexture({
-        width: 512, height: 160, bg: '#1e2229',
-        drawFn(ctx, w, h) {
-          ctx.shadowColor = '#7dd3fc';
-          ctx.shadowBlur = 22;
-          ctx.fillStyle = '#ffffff';
-          ctx.font = '900 92px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('INMO', w / 2, 114);
-        }
-      });
-      const doorSign = new THREE.Mesh(
-        new THREE.BoxGeometry(3.9, 0.65, 0.4),
-        new THREE.MeshBasicMaterial({ map: doorSignTex, toneMapped: false })
-      );
-      doorSign.position.set(-1.0, 2.7, 6.0);
-      envGroup.add(doorSign);
-
-      // Green Planters along the exterior storefront
-      function makePlanter(x, z, w = 2.6) {
-        const pl = new THREE.Group();
-        pl.position.set(x, 0, z);
-        const box = new THREE.Mesh(
-          new THREE.BoxGeometry(w, 0.75, 0.95),
-          new THREE.MeshStandardMaterial({ color: 0x525860, roughness: 0.8 })
-        );
-        box.position.y = 0.38;
-        box.castShadow = true;
-        pl.add(box);
-        for (let i = -1; i <= 1; i++) {
-          const bush = new THREE.Mesh(
-            new THREE.DodecahedronGeometry(0.45, 0),
-            new THREE.MeshStandardMaterial({ color: 0x3f6212, flatShading: true })
-          );
-          bush.position.set(i * (w * 0.28), 0.88, 0);
-          bush.castShadow = true;
-          pl.add(bush);
-        }
-        envGroup.add(pl);
-        addBoxCollider(x, z, w + 0.2, 1.0);
-      }
-      makePlanter(-5.8, 6.85, 2.8);
-      makePlanter(-9.6, 6.85, 2.6);
-      makePlanter(3.8, 6.85, 2.8);
-      makePlanter(7.6, 6.85, 2.8);
-
-      // 7. Street Props on Left Sidewalk (Tree, Park Bench, Trash Bin, Street Lamp with "A CLEARER YOU" Banner)
-      // Low-poly Tree (Left foreground matching Image 1)
-      const treeGroup = new THREE.Group();
-      treeGroup.position.set(-16.2, 0, 5.2);
-      const trunk = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.32, 0.48, 3.6, 7),
-        new THREE.MeshStandardMaterial({ color: 0x5c4033, flatShading: true })
-      );
-      trunk.position.y = 1.8;
-      trunk.castShadow = true;
-      treeGroup.add(trunk);
-      const canopy = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(2.65, 1),
-        new THREE.MeshStandardMaterial({ color: 0x315f41, flatShading: true, roughness: 0.8 })
-      );
-      canopy.position.y = 4.8;
-      canopy.castShadow = true;
-      treeGroup.add(canopy);
-      envGroup.add(treeGroup);
-      addBoxCollider(-16.2, 5.2, 1.5, 1.5);
-
-      // Wooden Park Bench
-      const benchGroup = new THREE.Group();
-      benchGroup.position.set(-14.6, 0, 7.6);
-      benchGroup.rotation.y = 0.25;
-      const seat = new THREE.Mesh(
-        new THREE.BoxGeometry(2.2, 0.15, 0.7),
-        new THREE.MeshStandardMaterial({ color: 0x784b2a })
-      );
-      seat.position.y = 0.5;
-      seat.castShadow = true;
-      benchGroup.add(seat);
-      const backRest = new THREE.Mesh(
-        new THREE.BoxGeometry(2.2, 0.55, 0.12),
-        new THREE.MeshStandardMaterial({ color: 0x784b2a })
-      );
-      backRest.position.set(0, 0.82, -0.3);
-      benchGroup.add(backRest);
-      envGroup.add(benchGroup);
-      addBoxCollider(-14.6, 7.6, 2.3, 0.9);
-
-      // Street Lamp Post with Blue Banner "A CLEARER YOU"
-      const lampGroup = new THREE.Group();
-      lampGroup.position.set(-11.8, 0, 8.2);
-      const pole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.12, 0.18, 5.4, 10),
-        new THREE.MeshStandardMaterial({ color: 0x272b30, metalness: 0.6 })
-      );
-      pole.position.y = 2.7;
-      pole.castShadow = true;
-      lampGroup.add(pole);
-      // Banner
-      const bannerTex = makeTextTexture({
-        width: 256, height: 512, bg: '#1d4ed8',
-        drawFn(ctx, w, h) {
-          ctx.fillStyle = '#e0f2fe';
-          ctx.font = 'bold 42px Inter, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('A', w / 2, 160);
-          ctx.fillText('CLEARER', w / 2, 240);
-          ctx.fillText('YOU', w / 2, 320);
-        }
-      });
-      const banner = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.95, 1.95),
-        new THREE.MeshStandardMaterial({ map: bannerTex, side: THREE.DoubleSide })
-      );
-      banner.position.set(0.6, 3.4, 0);
-      lampGroup.add(banner);
-      envGroup.add(lampGroup);
-      addBoxCollider(-11.8, 8.2, 0.6, 0.6);
-
-      scene.add(envGroup);
+      launchVenue=LaunchVenue.build({THREE,scene,camera,assets:INMOAssets,makeTextTexture,addCollider:addBoxCollider,sound:SoundFX});
     }
 
-    // -------------------------------------------------------------------------
-    // BUILD 6 NUMBERED DISPLAY COUNTERS & 3D AR GLASSES MESHES
-    // -------------------------------------------------------------------------
     const counterMeshes = [];
 
     function create3DGlassesMesh(code) {
@@ -1381,13 +753,13 @@
             ctx.font = '800 135px Inter, sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText(String(item.counterNum), 115, 178);
-            ctx.textAlign='left';ctx.font='600 31px sans-serif';ctx.fillStyle='#8db2c6';
-            ctx.fillText(item.name,260,116);ctx.font='21px sans-serif';ctx.fillText('AR COLLECTION',260,159);
+            ctx.textAlign='left';ctx.font='600 23px sans-serif';ctx.fillStyle='#8db2c6';
+            ctx.fillText(item.name,225,116);ctx.font='21px sans-serif';ctx.fillText('LAUNCH / 11.04',225,159);
           }
         });
 
-        const sideMat = new THREE.MeshStandardMaterial({ color: 0x29414f, roughness: 0.48, metalness: .25 });
-        const topMat = new THREE.MeshStandardMaterial({ color: 0x647c88, roughness: 0.32, metalness: .3, envMapIntensity: .55 });
+        const sideMat = new THREE.MeshStandardMaterial({ color: 0x3b3029, roughness: 0.48, metalness: .25 });
+        const topMat = new THREE.MeshStandardMaterial({ color: 0x635444, roughness: 0.32, metalness: .3, envMapIntensity: .55 });
         const frontMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: 0.35 });
 
         // Pedestal Base Box (3.2 x 1.25 x 1.75)
@@ -1408,7 +780,7 @@
         // Glowing Blue Underglow Strip around base (exact match to Image 1 & 2)
         const ledStrip = new THREE.Mesh(
           new THREE.BoxGeometry(3.28, 0.08, 1.83),
-          new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+          new THREE.MeshBasicMaterial({ color: 0xe6ba73 })
         );
         ledStrip.position.y = 0.04;
         cg.add(ledStrip);
@@ -1438,7 +810,7 @@
           width: 256, height: 256, bg: '#1e293b',
           drawFn(ctx, w, h) {
             ctx.fillStyle = '#f8fafc';
-            ctx.font = 'bold 34px Inter, sans-serif';
+            ctx.font = 'bold 23px Inter, sans-serif';
             ctx.fillText(item.name, 22, 65);
             ctx.fillStyle = '#38bdf8';
             ctx.font = 'bold 46px JetBrains Mono, monospace';
@@ -1479,7 +851,7 @@
         // Selection / Highlight Ring around counter when targeted
         const highlightRing = new THREE.Mesh(
           new THREE.RingGeometry(1.9, 2.08, 32),
-          new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.0 })
+          new THREE.MeshBasicMaterial({ color: 0xe6ba73, side: THREE.DoubleSide, transparent: true, opacity: 0.0 })
         );
         highlightRing.rotation.x = -Math.PI / 2;
         highlightRing.position.y = 0.03;
@@ -1510,12 +882,12 @@
         id: 1,
         name: '左后方1号摄像头',
         mountPos: new THREE.Vector3(-12.6, 5.2, -9.2),
-        baseAngle: 0.68,         // Pointing SE towards Counter #1 & #2
-        sweepAmp: 0.58,          // Sweeps back and forth
-        speed: 0.95,
+        baseAngle: 1.15,         // Pointing SE towards Counter #1 & #2
+        sweepAmp: 0.66,          // Sweeps back and forth
+        speed: 0.46,
         phase: 0.0,
-        range: 10.2,
-        fovHalf: 0.34            // ~39 degrees total cone angle
+        range: 14.5,
+        fovHalf: 0.15            // ~39 degrees total cone angle
       },
       {
         id: 2,
@@ -1532,12 +904,12 @@
         id: 3,
         name: '右后方3号摄像头',
         mountPos: new THREE.Vector3(12.6, 5.2, -9.2),
-        baseAngle: -0.68,        // Pointing SW towards Counter #2 & #3
-        sweepAmp: 0.58,
-        speed: 1.05,
-        phase: 3.1,
-        range: 10.2,
-        fovHalf: 0.34
+        baseAngle: -1.15,        // Pointing SW towards Counter #2 & #3
+        sweepAmp: -0.66,
+        speed: 0.46,
+        phase: 0,
+        range: 14.5,
+        fovHalf: 0.15
       },
       {
         id: 4,
@@ -1771,7 +1143,7 @@
       // Glowing Smartphone in Clerk's right hand
       const phone = new THREE.Mesh(
         new THREE.BoxGeometry(0.18, 0.04, 0.32),
-        new THREE.MeshBasicMaterial({ color: 0x38bdf8 })
+        new THREE.MeshBasicMaterial({ color: 0xe6ba73 })
       );
       phone.position.set(-0.15, -0.68, 0.24);
       phone.visible = false;
@@ -1956,7 +1328,7 @@
     // Target click marker on ground
     const clickMarker = new THREE.Mesh(
       new THREE.RingGeometry(0.28, 0.42, 24),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.0 })
+      new THREE.MeshBasicMaterial({ color: 0xe6ba73, side: THREE.DoubleSide, transparent: true, opacity: 0.0 })
     );
     clickMarker.rotation.x = -Math.PI / 2;
     clickMarker.position.y = 0.04;
@@ -1966,7 +1338,7 @@
     buildEnvironment();
     buildCounters();
     buildSecurityCameras();
-    buildClerk();
+    buildClerk(); clerk.group.visible=false;
     buildPlayer();
     for(const character of [player.group,clerk.group]){
       const shadow=INMOAssets.contactShadow(THREE,1.5,1.25,.58);shadow.position.y=.033;character.add(shadow);
@@ -1984,11 +1356,11 @@
       exposure: 0, // 0..100 stealth exposure bar
       stealingTarget: null, // Counter object currently being stolen
       stealProgress: 0, // 0..1
-      STEAL_DURATION: 1.35, // Seconds to steal a pair of glasses
+      STEAL_DURATION: 3.4, // Seconds to steal a pair of glasses
       nearestCounter: null,
       scoreSavedThisRun: false,
       runId: Date.now().toString(36),
-      resultBonus: 0
+      resultBonus: 0, stealingMethod:'hands',stealDuration:3.4
     };
 
     const keys = {};
@@ -2014,8 +1386,6 @@
       document.getElementById('pause-state').classList.toggle('hidden', !isPaused());
     }
     function manualPause(paused) {
-      if (chapter.active) { chapter.pause(paused); return; }
-      if (!document.getElementById('chase-entry').hidden) return;
       if (gameState.status !== 'PLAYING') return;
       if (paused) modalReturnFocus = document.activeElement;
       setPaused('manual', paused);
@@ -2045,7 +1415,7 @@
     }
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Tab') {
-        const topDialog = ['chase-entry','chase-result','chase-pause','chapter-result','chapter-pause','modal-leaderboard','modal-endgame','modal-catalog','modal-pause'].map(id=>document.getElementById(id)).find(el=>!el.hidden&&!el.classList.contains('hidden'));
+        const topDialog = ['modal-leaderboard','modal-endgame','modal-catalog','modal-pause'].map(id=>document.getElementById(id)).find(el=>!el.hidden&&!el.classList.contains('hidden'));
         if (topDialog) {
           const focusable = [...topDialog.querySelectorAll('button:not([disabled]), a[href], input:not([disabled])')].filter(el=>!el.closest('.hidden,[hidden]'));
           const first=focusable[0], last=focusable[focusable.length-1];
@@ -2058,10 +1428,6 @@
       if (e.target.closest?.('input, textarea, [contenteditable="true"]')) return;
       const k = e.key.toLowerCase();
       if (['arrowup','arrowdown','arrowleft','arrowright',' ','e','p','escape'].includes(k)) e.preventDefault();
-      if (chapter.active) {
-        if (!chapter.paused) keys[k] = true;
-        SoundFX.init(); chapter.key(e); return;
-      }
       if (k === 'escape' || k === 'p') {
         if (e.repeat) return;
         const modal = ['modal-catalog','modal-leaderboard'].find(id => !document.getElementById(id).classList.contains('hidden'));
@@ -2150,7 +1516,7 @@
         listEl.appendChild(row);
       });
 
-      document.getElementById('stolen-progress-badge').textContent = `${stolenTotal}/6`;
+      document.getElementById('stolen-progress-badge').textContent = `${stolenTotal}/1`;
     }
 
     function highlightAndNavigateToCounter(item) {
@@ -2168,7 +1534,7 @@
       else showToast('没有可走近的路线，请换一侧靠近。');
     }
 
-    function tryStartStealing(specificCounter) {
+    function tryStartStealing(specificCounter,method='hands') {
       if (gameState.status !== 'PLAYING' || isPaused()) return;
       const target = specificCounter || gameState.nearestCounter;
       if (!target || target.data.stolen) return;
@@ -2177,17 +1543,18 @@
       const dz = player.pos.z - target.data.pos.z;
       const dist = Math.hypot(dx, dz);
 
-      if (dist <= 2.95) {
+      if (dist <= (method==='hook'?6.2:2.65)) {
         if (gameState.stealingTarget !== target) {
           player.targetDest = null; player.path = [];
           clickMarker.material.opacity = 0;
           gameState.stealingTarget = target;
-          gameState.stealProgress = 0;
-          SoundFX.stealTick();
+          gameState.stealProgress = 0; gameState.stealingMethod=method;gameState.stealDuration=method==='hook'?4.6:3.4;
+          SoundFX.stealTick(); return true;
         }
       } else {
         // Walk up first; the player confirms a safe moment after arriving.
-        highlightAndNavigateToCounter(target.data);
+        if(method==='hook')navigateTo({x:0,z:.15},'伸缩钩操作位');else highlightAndNavigateToCounter(target.data);
+        showToast(method==='hook'?'先走近伸缩钩操作位，再点一次使用。':'走近后按 E 取镜。');
       }
     }
 
@@ -2211,14 +1578,14 @@
       renderMissionListUI();
 
       // Check Victory Condition: All 6 AR Glasses Stolen!
-      if (gameState.stolenCount >= 6) {
+      if (gameState.stolenCount >= GLASSES_DATA.length) {
         triggerVictory();
       }
     }
 
     function triggerGameOver(reasonText) {
       if (gameState.status !== 'PLAYING') return;
-      gameState.status = 'GAMEOVER';
+      gameState.status = 'GAMEOVER';launchTools.update(0,null,'hands');document.getElementById('launch-bubbles').style.opacity='0';
       gameState.stealingTarget = null;
       player.targetDest = null;
       SoundFX.caughtSiren();
@@ -2228,7 +1595,7 @@
 
     function triggerVictory() {
       if (gameState.status !== 'PLAYING') return;
-      gameState.status = 'VICTORY';
+      gameState.status = 'VICTORY';launchTools.update(0,null,'hands');document.getElementById('launch-bubbles').style.opacity='0';
       gameState.stealingTarget = null;
       player.targetDest = null;
       SoundFX.victoryFanfare();
@@ -2241,7 +1608,7 @@
       gameState.score += totalBonus;
       document.getElementById('score-val').textContent = gameState.score;
 
-      showEndgameModal(true, '太漂亮了！你成功避开所有摄像头与店员视线，将店内 6 台 INMO AR 眼镜全部顺出！', totalBonus);
+      showEndgameModal(true, '你趁发布会的热闹拿到了神秘新品样机。行动成功！', totalBonus);
     }
 
     function formatTime(sec) {
@@ -2259,19 +1626,19 @@
       if (isWin) {
         badge.textContent = '🏆';
         badge.className = 'inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-3xl mb-3';
-        title.textContent = 'MISSION COMPLETE · 完美潜行通关！';
+        title.textContent = '样机到手 · 行动成功';
         title.className = 'mono-font text-2xl font-extrabold tracking-wide text-emerald-400';
       } else {
         badge.textContent = '🚨';
         badge.className = 'inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-500/20 border border-red-400/50 text-3xl mb-3';
-        title.textContent = 'CAUGHT · 被当场抓获！';
+        title.textContent = '被发现了 · 行动结束';
         title.className = 'mono-font text-2xl font-extrabold tracking-wide text-red-400';
       }
 
       reason.textContent = reasonText;
       const lootRmb = GLASSES_DATA.reduce((acc, g) => acc + (g.stolen ? g.priceRmb : 0), 0);
-      document.getElementById('end-stolen-count').textContent = `${gameState.stolenCount} / 6 台`;
-      document.getElementById('end-loot-value').textContent = `¥${lootRmb.toLocaleString('zh-CN')}`;
+      document.getElementById('end-stolen-count').textContent = `${gameState.stolenCount} / 1 副`;
+      document.getElementById('end-loot-value').textContent = gameState.stolenCount?'样机到手':'尚未取回';
       document.getElementById('end-time').textContent = formatTime(gameState.elapsedTime);
       document.getElementById('end-bonus').textContent = `+${bonus}`;
       document.getElementById('end-final-score').textContent = String(gameState.score);
@@ -2280,9 +1647,9 @@
       saveBtn.textContent = isWin ? '更新代号' : '计入排行榜';
       saveBtn.disabled = false;
       document.getElementById('endgame-save-box').classList.toggle('hidden', !isWin);
-      document.getElementById('btn-continue-story').classList.toggle('hidden', isWin);
+      
       document.getElementById('btn-end-leaderboard').classList.toggle('hidden', !isWin);
-      document.getElementById('btn-play-again').textContent = isWin ? '再来一局' : '重来';
+      document.getElementById('btn-play-again').textContent = isWin ? '再来一局' : '重新来';
       if (isWin) saveCurrentRun(false);
 
       modal.classList.remove('hidden');
@@ -2291,7 +1658,7 @@
     }
 
     function restartGame() {
-      chapter.stop();
+      launchVenue.reset(); launchTools.reset();document.getElementById('launch-bubbles').style.opacity='1';
       gameState.status = 'PLAYING'; pauseReasons.clear(); clearInput();
       camYawOffset=0; cameraTarget.set(0,.5,1.5);
       player.path = []; clerk.route = []; gameState.nearestCounter = null;
@@ -2306,7 +1673,7 @@
         cm.glasses3D.visible = true;
         cm.vitrine.position.y = 1.78;
         cm.vitrine.material.opacity = .045;
-        cm.ledStrip.material.color.setHex(0x38bdf8);
+        cm.ledStrip.material.color.setHex(0xe6ba73);
       });
 
       // Reset player outside store entrance on street
@@ -2340,7 +1707,7 @@
       document.getElementById('modal-endgame').classList.remove('flex');
 
       renderMissionListUI();
-      showToast('新行动开始 · 拿齐六副眼镜即可通关。');
+      showToast('发布会重新开始 · 拿到主舞台样机。道具与筹码已补充。');
     }
 
     // =========================================================================
@@ -2350,28 +1717,11 @@
     const mouseNDC = new THREE.Vector2();
     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-    const chapter = PoliceChapter.create({ THREE, scene, camera, player, keys, sound:SoundFX,
-      toast:showToast, assets:INMOAssets, rules:GameRules, clearInput, restart:restartGame,
-      showroomPath:(start,end)=>routePlanner.findPath(start,end) });
-    document.getElementById('btn-continue-story').addEventListener('click',()=>{
-      if (gameState.status !== 'GAMEOVER') return;
-      clearInput(); pauseReasons.clear(); cancelSteal();
-      document.getElementById('modal-endgame').classList.add('hidden');
-      document.getElementById('modal-endgame').classList.remove('flex');
-      chapter.start();
-    });
-    document.getElementById('chase-entry-start').addEventListener('click',()=>{
-      document.getElementById('chase-entry').hidden=true;
-      document.getElementById('modal-pause').classList.add('hidden');pauseReasons.clear();clearInput();
-      document.getElementById('pause-state').classList.add('hidden');chapter.startChasePreview();
-    });
-    document.getElementById('chase-entry-back').addEventListener('click',()=>{
-      document.getElementById('chase-entry').hidden=true;setPaused('chapter-entry',false);
-    });
-    if(location.hash==='#chase'){document.getElementById('chase-entry').hidden=false;setPaused('chapter-entry',true);}
+    const launchTools=LaunchTools.create({THREE,scene,player,venue:launchVenue,navigate:navigateTo,toast:showToast,
+      sound:SoundFX,canAct:()=>gameState.status==='PLAYING'&&!isPaused(),
+      onHook:()=>tryStartStealing(counterMeshes[0],'hook')});
 
     renderer.domElement.addEventListener('pointerdown', (e) => {
-      if (chapter.active) { SoundFX.init(); chapter.pointer(e,renderer.domElement); return; }
       if (gameState.status !== 'PLAYING' || isPaused()) return;
       SoundFX.init();
       if (e.button === 2 || e.button === 1) {
@@ -2444,60 +1794,13 @@
       };
     }
 
-    function updateStealthUI(inRedCam, inClerkCone) {
-      const segs = document.querySelectorAll('#stealth-bars .stealth-seg');
-      const badge = document.getElementById('stealth-badge');
-      const statusText = document.getElementById('stealth-status-text');
-      const zoneLabel = document.getElementById('player-zone-label');
-
-      const inStore = player.pos.z < 6.0;
-      zoneLabel.textContent = inStore ? '展厅内' : '街道 · 安全';
-      zoneLabel.className = inStore ? 'text-sky-400 font-semibold' : 'text-emerald-400 font-semibold';
-
-      // Number of active segments (minimum 2 green bars when safe, matching Image 1)
-      const activeBars = Math.max(2, Math.min(8, Math.ceil((gameState.exposure / 100) * 8) || (player.isCrouching ? 2 : 3)));
-      const isDanger = inRedCam || inClerkCone || gameState.exposure > 55;
-      const isCaution = !isDanger && (gameState.exposure > 15 || clerk.state === 'LOOKING' && inStore);
-
-      segs.forEach((seg, idx) => {
-        if (idx < activeBars) {
-          if (isDanger) {
-            seg.style.background = '#ef4444';
-            seg.style.boxShadow = '0 0 8px rgba(239,68,68,0.6)';
-          } else if (isCaution && idx >= 3) {
-            seg.style.background = '#facc15';
-            seg.style.boxShadow = '0 0 6px rgba(250,204,21,0.4)';
-          } else {
-            seg.style.background = '#22c55e';
-            seg.style.boxShadow = '0 0 6px rgba(34,197,94,0.45)';
-          }
-        } else {
-          seg.style.background = '#2d3748';
-          seg.style.boxShadow = 'none';
-        }
-      });
-
-      if (isDanger) {
-        badge.textContent = '视线内 · 暂勿取镜';
-        badge.className = 'mono-font text-[11px] font-bold text-amber-400';
-        statusText.textContent = '正处于监控/店员视线内：正常逛街不会被抓，切勿此时顺眼镜！';
-        player.ringMesh.material.color.setHex(0xfacc15);
-      } else if (clerk.state === 'PHONE') {
-        badge.textContent = '店员玩手机 · 仍需避开红光';
-        badge.className = 'mono-font text-[11px] font-bold text-sky-300';
-        statusText.textContent = '店员正在低头玩手机，注意避开红光监控！';
-        player.ringMesh.material.color.setHex(0x4ade80);
-      } else if (player.isCrouching) {
-        badge.textContent = '蹲姿慢走 · 可取镜';
-        badge.className = 'mono-font text-[11px] font-bold text-emerald-400';
-        statusText.textContent = '慢走便于定位，仍需避开红色与黄色视线。';
-        player.ringMesh.material.color.setHex(0x38bdf8);
-      } else {
-        badge.textContent = '安全 · 可取镜';
-        badge.className = 'mono-font text-[11px] font-bold text-emerald-400';
-        statusText.textContent = '靠近柜台按 E 取镜，移动可中断。';
-        player.ringMesh.material.color.setHex(0x4ade80);
-      }
+    function updateStealthUI(inRedCam,inCrowd) {
+      const danger=inRedCam||inCrowd;
+      document.getElementById('player-zone-label').textContent=player.pos.z<6?'新品体验区':'发布广场';
+      document.getElementById('stealth-badge').textContent=danger?'有人注意 · 暂勿动手':'注意力空窗 · 可行动';
+      document.getElementById('stealth-status-text').textContent=danger?'镜头或人群能看到你。取镜时被看见，本局结束。':'正常走动不会被抓。观察安保、玩手机与演出应援的时机。';
+      document.querySelectorAll('#stealth-bars .stealth-seg').forEach((s,i)=>s.style.background=i<(danger?8:3)?(danger?'#e98261':'#80b6a4'):'#343b3a');
+      player.ringMesh.material.color.setHex(danger?0xe5a85c:0x80c3a5);
     }
 
     function drawMinimap() {
@@ -2551,37 +1854,8 @@
         ctx.fill();
       });
 
-      // 3. Clerk 6-Counter Patrol Route + Yellow Vision Cone & Clerk Icon
-      ctx.save();
-      ctx.strokeStyle = 'rgba(250, 204, 21, 0.22)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      CLERK_WAYPOINTS.forEach((wp, i) => {
-        const wx = mapX(wp.x), wy = mapY(wp.z);
-        if (i === 0) ctx.moveTo(wx, wy);
-        else ctx.lineTo(wx, wy);
-      });
-      ctx.closePath();
-      ctx.stroke();
-      ctx.restore();
-
-      const clx = mapX(clerk.pos.x);
-      const cly = mapY(clerk.pos.z);
-      if (clerk.state !== 'PHONE') {
-        const cr = scaleLen(clerk.range);
-        const cAngle = Math.PI / 2 - clerk.angle;
-        ctx.fillStyle = 'rgba(250, 204, 21, 0.35)';
-        ctx.beginPath();
-        ctx.moveTo(clx, cly);
-        ctx.arc(clx, cly, cr, cAngle - clerk.fovHalf, cAngle + clerk.fovHalf);
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.fillStyle = clerk.state === 'PHONE' ? '#38bdf8' : '#fde047';
-      ctx.beginPath();
-      ctx.arc(clx, cly, 3.8, 0, Math.PI * 2);
-      ctx.fill();
+      // 3. Crowd and security positions.
+      for(const p of launchVenue.people){ctx.fillStyle=p.role==='security'?'#eab656':'#829fa8';ctx.beginPath();ctx.arc(mapX(p.pos.x),mapY(p.pos.z),2.2,0,Math.PI*2);ctx.fill();}
 
       // 4. The 6 Display Counters (Rectangles on minimap matching Image 1)
       GLASSES_DATA.forEach((item) => {
@@ -2616,9 +1890,6 @@
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
 
-      if (chapter.active) {
-        chapter.update(dt); chapter.updateCamera(dt); renderer.render(scene,camera); return;
-      }
 
       if (gameState.status === 'PLAYING' && !isPaused()) {
         gameState.elapsedTime += dt;
@@ -2748,132 +2019,18 @@
         });
 
         // -------------------------------------------------------------------
-        // C. UPDATE STORE CLERK AI (Full 6-Counter Patrol Loop + Walk Anim + Phone)
-        // -------------------------------------------------------------------
-        const targetWP = CLERK_WAYPOINTS[clerk.waypointIdx];
-        let clerkIsWalking = false;
-
-        if (clerk.state === 'PATROL_WALK') {
-          if (!clerk.route.length) clerk.route = routePlanner.findPath(clerk.pos,targetWP) || [];
-          let next=clerk.route[0];
-          while(next && Math.hypot(next.x-clerk.pos.x,next.z-clerk.pos.z)<.10){clerk.route.shift();next=clerk.route[0];}
-          if (next) {
-            const dx=next.x-clerk.pos.x,dz=next.z-clerk.pos.z,distance=Math.hypot(dx,dz),step=Math.min(distance,2.25*dt);
-            clerkIsWalking=true; clerk.pos.x+=dx/distance*step; clerk.pos.z+=dz/distance*step;
-            clerk.targetAngle=Math.atan2(dx,dz);
-          } else if (Math.random() < .45) {
-            clerk.state='PHONE'; clerk.stateTimer=3.5+Math.random()*2;
-            clerk.volCone.visible=false; clerk.phoneMesh.visible=true; clerk.headGroup.rotation.x=.42;
-          } else {
-            clerk.state='INSPECT'; clerk.stateTimer=1.8+Math.random()*1.6;
-            clerk.targetAngle=targetWP.inspectAngle+(Math.random()-.5)*.6;
-          }
-        } else if (clerk.state === 'INSPECT') {
-          clerk.stateTimer -= dt;
-          // Occasionally glance slightly left/right while inspecting counter
-          if (Math.random() < 1 - Math.exp(-1.8 * dt)) {
-            clerk.targetAngle += (Math.random() - 0.5) * 0.9;
-          }
-          if (clerk.stateTimer <= 0) {
-            if (Math.random() < 0.35) {
-              clerk.state = 'PHONE';
-              clerk.stateTimer = 3.0 + Math.random() * 1.5;
-              clerk.volCone.visible = false;
-              clerk.phoneMesh.visible = true;
-              clerk.headGroup.rotation.x = 0.42;
-            } else {
-              clerk.waypointIdx = (clerk.waypointIdx + 1) % CLERK_WAYPOINTS.length;
-              clerk.state = 'PATROL_WALK';
-            }
-          }
-        } else if (clerk.state === 'PHONE') {
-          clerk.stateTimer -= dt;
-          if (clerk.stateTimer <= 0) {
-            clerk.volCone.visible = true;
-            clerk.phoneMesh.visible = false;
-            clerk.headGroup.rotation.x = 0;
-            clerk.waypointIdx = (clerk.waypointIdx + 1) % CLERK_WAYPOINTS.length;
-            clerk.state = 'PATROL_WALK';
-          }
+        // C. Audience, media and patrol security.
+        launchVenue.update(dt,player.pos);
+        let crowdWitness=launchVenue.witness(player.pos);
+        if(gameState.stealingTarget&&gameState.stealingMethod==='hook'){
+          const p=gameState.stealingTarget.data.pos;
+          crowdWitness=crowdWitness||launchVenue.witness({x:p.x,z:p.z+1});
+          for(const cam of securityCameras)if(isPointInVisionCone(p.x,p.z,cam.cfg.mountPos.x,cam.cfg.mountPos.z,cam.currentAngle,cam.cfg.range,cam.cfg.fovHalf))caughtByCam=cam.cfg;
         }
+        const caughtByClerk=Boolean(crowdWitness);
+        clerkBubbleEl.classList.add('hidden');
+        launchTools.update(dt,gameState.stealingTarget,gameState.stealingMethod);
 
-        // Smoothly rotate clerk toward targetAngle
-        let adiff = clerk.targetAngle - clerk.angle;
-        while (adiff > Math.PI) adiff -= Math.PI * 2;
-        while (adiff < -Math.PI) adiff += Math.PI * 2;
-        clerk.angle += adiff * Math.min(1, dt * 6.5);
-
-        // Animate Clerk's Legs, Arms & Vertical Step Bounce when walking (No ice-skating!)
-        if (clerkIsWalking) {
-          const prevCC = clerk.walkCycle;
-          clerk.walkCycle += dt * 13.0;
-          if (Math.floor(prevCC / Math.PI) !== Math.floor(clerk.walkCycle / Math.PI)) {
-            spawnStepPuff(clerk.pos.x, clerk.pos.z, 0xfde047);
-          }
-          const cSwing = Math.sin(clerk.walkCycle);
-          clerk.legL.rotation.x = cSwing * 1.12;
-          clerk.legR.rotation.x = -cSwing * 1.12;
-          clerk.legL.position.y = 0.86 + Math.max(0, cSwing) * 0.13;
-          clerk.legR.position.y = 0.86 + Math.max(0, -cSwing) * 0.13;
-          clerk.legL.position.z = cSwing * 0.11;
-          clerk.legR.position.z = -cSwing * 0.11;
-          clerk.leftArm.rotation.x = -cSwing * 0.88;
-          clerk.rightArm.rotation.x = cSwing * 0.88;
-          clerk.bodyGroup.position.y = Math.abs(cSwing) * 0.15;
-          clerk.bodyGroup.rotation.z = Math.cos(clerk.walkCycle) * 0.06;
-        } else {
-          clerk.legL.position.z *= 0.8;
-          clerk.legR.position.z *= 0.8;
-          clerk.legL.rotation.x *= 0.8;
-          clerk.legR.rotation.x *= 0.8;
-          clerk.legL.position.y = 0.86;
-          clerk.legR.position.y = 0.86;
-          clerk.leftArm.rotation.x *= 0.8;
-          clerk.bodyGroup.position.y = 0;
-          clerk.bodyGroup.rotation.z *= 0.8;
-          if (clerk.state === 'PHONE') {
-            clerk.rightArm.rotation.x = -0.92;
-          } else {
-            clerk.rightArm.rotation.x *= 0.8;
-          }
-        }
-
-        clerk.group.position.copy(clerk.pos);
-        clerk.group.rotation.y = clerk.angle;
-
-        // Check if player is inside Clerk's active yellow vision cone
-        let caughtByClerk = false;
-        if (clerk.state !== 'PHONE' && player.pos.z < 5.95) {
-          caughtByClerk = isPointInVisionCone(
-            player.pos.x,
-            player.pos.z,
-            clerk.pos.x,
-            clerk.pos.z,
-            clerk.angle,
-            clerk.range,
-            clerk.fovHalf
-          );
-        }
-
-        // Update Floating Clerk Status Bubble
-        const clerkScreen = projectToScreen(new THREE.Vector3(clerk.pos.x, 2.55, clerk.pos.z));
-        if (clerkScreen.visible) {
-          clerkBubbleEl.style.left = `${clerkScreen.x}px`;
-          clerkBubbleEl.style.top = `${clerkScreen.y}px`;
-          clerkBubbleEl.classList.remove('hidden');
-          const inner = document.getElementById('clerk-bubble-inner');
-          if (clerk.state === 'PHONE') {
-            inner.className = 'px-2.5 py-1 rounded-full mono-font text-[11px] font-bold shadow-lg flex items-center gap-1.5 bg-emerald-950/90 border border-emerald-400/75 text-emerald-300';
-            inner.innerHTML = `<span>📱 玩手机不看 (${clerk.stateTimer.toFixed(1)}s)</span>`;
-          } else {
-            inner.className = 'px-2 py-0.5 rounded-full mono-font text-[10px] font-semibold shadow flex items-center gap-1 bg-amber-950/85 border border-amber-400/60 text-amber-300';
-            inner.innerHTML = `<span>👀 ${targetWP.label}</span>`;
-          }
-        } else {
-          clerkBubbleEl.classList.add('hidden');
-        }
-
-        // -------------------------------------------------------------------
         // D. PROXIMITY TO COUNTERS & STEALING PROGRESS
         // -------------------------------------------------------------------
         let nearest = null;
@@ -2892,7 +2049,7 @@
           cm.highlightRing.material.opacity = 0;
         });
 
-        gameState.nearestCounter = minDist <= 2.95 ? nearest : null;
+        gameState.nearestCounter = minDist <= 2.65 ? nearest : null;
         const quickStealBtn = document.getElementById('btn-quick-steal');
 
         if (gameState.nearestCounter) {
@@ -2915,14 +2072,14 @@
               document.getElementById('tt-counter-num').textContent = `#${item.counterNum}号柜台`;
               document.getElementById('tt-price').textContent = item.displayPrice;
               document.getElementById('tt-spec').textContent = item.spec;
-              document.getElementById('tt-svg-holder').innerHTML = `<img class="product-photo" data-model="${item.code}" src="${INMOAssets.products[item.code].image}" alt="${item.name} 产品展示图">`;
+              document.getElementById('tt-svg-holder').innerHTML = INMOAssets.conceptSVG();
             }
           }
         } else {
           tooltipEl.classList.add('hidden');
           quickStealBtn.classList.add('hidden');
           quickStealBtn.classList.remove('flex');
-          cancelSteal(false);
+          if(gameState.stealingMethod!=='hook')cancelSteal(false);
         }
 
         const progWrap = document.getElementById('tt-progress-wrap');
@@ -2931,10 +2088,10 @@
         gameState.exposure = seen ? 65 : Math.max(0,gameState.exposure-90*dt);
         if (gameState.stealingTarget) {
           const target = gameState.stealingTarget;
-          const state = GameRules.advanceSteal(gameState.stealProgress,dt,gameState.STEAL_DURATION,seen,player.isMoving);
+          const state = GameRules.advanceSteal(gameState.stealProgress,dt,gameState.stealDuration,seen,player.isMoving);
           if (state.outcome === 'caught') {
             gameState.exposure=100;
-            triggerGameOver('取走 ' + target.data.name + ' 时，被' + (caughtByCam ? caughtByCam.name : '店员') + '看见了。');
+            triggerGameOver('取走 ' + target.data.name + ' 时，被' + (caughtByCam ? caughtByCam.name : crowdWitness.name) + '看见了。');
             progWrap.classList.add('hidden');
           } else if (state.outcome === 'cancelled') cancelSteal(true);
           else {
@@ -2943,8 +2100,8 @@
             if (state.outcome === 'complete') { progWrap.classList.add('hidden'); completeSteal(target); }
           }
         } else progWrap.classList.add('hidden');
-        document.getElementById('tt-take-btn').querySelector('span').textContent=gameState.stealingTarget?'取镜中 · 移动可中断':'取走眼镜 · 约 1.4 秒';
-        document.getElementById('btn-quick-steal').textContent=gameState.stealingTarget?'取镜中…':'取走眼镜';
+        document.getElementById('tt-take-btn').querySelector('span').textContent=gameState.stealingTarget?(gameState.stealingMethod==='hook'?'回收钩线中 · 移动会中断':'取镜中 · 移动可中断'):'取走样机 · 约 3.4 秒';
+        document.getElementById('btn-quick-steal').textContent=gameState.stealingTarget?'取镜中…':'取走样机';
 
         // Update footstep puffs
         stepPuffs.forEach((p) => {
@@ -3007,7 +2164,7 @@
     
     function bindDpad(btnId,keyName) {
       const el=document.getElementById(btnId);
-      el.addEventListener('pointerdown',e=>{e.preventDefault(); if(chapter.active?chapter.paused:(isPaused()||gameState.status!=='PLAYING')) return; SoundFX.init();el.setPointerCapture(e.pointerId);keys[keyName]=true;});
+      el.addEventListener('pointerdown',e=>{e.preventDefault(); if(isPaused()||gameState.status!=='PLAYING') return; SoundFX.init();el.setPointerCapture(e.pointerId);keys[keyName]=true;});
       for(const event of ['pointerup','pointercancel','lostpointercapture']) el.addEventListener(event,e=>{e.preventDefault();keys[keyName]=false;});
     }
     bindDpad('dpad-up','w');bindDpad('dpad-down','s');bindDpad('dpad-left','a');bindDpad('dpad-right','d');
@@ -3051,7 +2208,7 @@
     function saveCurrentRun(openBoard=true) {
       if(gameState.status!=='VICTORY') return;
       const name=document.getElementById('player-name-input').value.trim().slice(0,16)||'潜行者';
-      const entry={id:gameState.runId,name,score:gameState.score,seconds:gameState.elapsedTime,note:'6/6 通关 · '+formatTime(gameState.elapsedTime)};
+      const entry={id:gameState.runId,name,score:gameState.score,seconds:gameState.elapsedTime,note:'发布会样机 · '+formatTime(gameState.elapsedTime)};
       const old=leaderboardData.findIndex(x=>x.id===entry.id);
       if(old>=0) leaderboardData[old]=entry; else leaderboardData.push(entry);
       leaderboardData.sort((a,b)=>b.score-a.score||(a.seconds||0)-(b.seconds||0));leaderboardData=leaderboardData.slice(0,10);
@@ -3070,36 +2227,8 @@
     // Catalog & Real Pricing Modal
     const catModal = document.getElementById('modal-catalog');
     function renderCatalogModal() {
-      const grid = document.getElementById('catalog-grid');
-      grid.innerHTML = '';
-      GLASSES_DATA.forEach((item) => {
-        const card = document.createElement('div');
-        card.className = 'p-3 rounded-lg bg-slate-900/90 border border-slate-700/80 hover:border-sky-400/70 transition cursor-pointer flex items-center gap-3';
-        card.innerHTML = `
-          <div class="w-24 h-16 bg-slate-950 rounded border border-slate-800 flex items-center justify-center flex-shrink-0 p-1">
-            <img class="product-photo" data-model="${item.code}" src="${INMOAssets.products[item.code].image}" alt="${item.name} 产品展示图" loading="lazy">
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between">
-              <span class="mono-font text-sm font-bold text-white">#${item.counterNum} ${item.name}</span>
-              <span class="mono-font text-xs font-extrabold text-sky-300">${item.displayPrice}</span>
-            </div>
-            <p class="text-[11px] text-slate-400 mt-1 leading-snug">${item.spec}</p>
-            <div class="mt-1.5 flex items-center justify-between gap-2 text-[10px] mono-font">
-              <span class="${item.stolen ? 'text-emerald-400' : 'text-sky-400'}">${item.stolen ? '✔ 已取走' : `📍 ${item.priceType}`}</span>
-              <a class="text-slate-400 hover:text-sky-300 underline" href="${item.priceSource}" target="_blank" rel="noopener noreferrer">价格来源</a>
-            </div>
-          </div>
-        `;
-        card.addEventListener('click', (event) => {
-          if (event.target.closest('a')) return;
-          closeGameModal('modal-catalog');
-          if (!item.stolen && gameState.status === 'PLAYING') {
-            highlightAndNavigateToCounter(item);
-          }
-        });
-        grid.appendChild(card);
-      });
+      document.getElementById('catalog-grid').innerHTML=`<div class="launch-concept-card"><div>${INMOAssets.conceptSVG()}</div><h3>INMO 神秘新品 · 发布会样机</h3><p>目标位于店内主舞台展台。型号、人民币售价与正式外观尚待公布；场景里的眼镜为原创游戏概念造型。</p><p>海报视觉参考：用户提供的「11.04 影目新品发布会」。</p><button id="btn-find-prototype" class="hud-btn">导航到样机展台</button></div>`;
+      document.getElementById('btn-find-prototype').addEventListener('click',()=>{closeGameModal('modal-catalog');if(gameState.status==='PLAYING')highlightAndNavigateToCounter(GLASSES_DATA[0]);});
     }
 
     document.getElementById('btn-price-info').addEventListener('click', () => {
@@ -3124,7 +2253,7 @@
       if(window.gameBootFailed) return;
       document.getElementById('boot-status').classList.add('hidden');
       try{document.getElementById('player-name-input').value=localStorage.getItem('inmo_player_name')||'潜行者';}catch{}
-      showToast('进入店铺，走近柜台后按 E · 红光与黄光中不要取镜。',6500);
+      showToast('广场正在暖场。进入店内拿样机；道具里有伸缩钩、饮料和服务员路线。',6500);
       drawMinimap();
       renderMissionListUI();
       renderLeaderboardModal();
