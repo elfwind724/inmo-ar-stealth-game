@@ -253,7 +253,7 @@
   </div>
 
   <div id="top-right-hud" class="hud-panel fixed z-20">
-    <div class="score-row"><div><span class="score-caption">得分</span><span id="score-val">0</span></div><span id="timer-val">00:00</span></div>
+    <div class="score-row"><div><span class="score-caption">得分</span><span id="score-val">0</span></div><button id="btn-music-toggle" class="hud-btn" type="button" aria-label="播放会场音乐" aria-pressed="false">♫ 播放</button><span id="timer-val">00:00</span></div>
     <div class="hud-actions"><button id="btn-leaderboard" class="hud-btn">本机榜</button><button id="btn-pause" class="hud-btn" aria-label="暂停及操作说明">暂停 / 帮助</button></div>
     <span id="pause-state" class="hidden">已暂停</span>
   </div>
@@ -412,6 +412,8 @@
   </div>
 
   <div id="launch-bubbles" aria-hidden="true"></div>
+  <audio id="venue-music" src="./assets/venue-bgm.mp3" loop preload="none" hidden></audio>
+  <script src="./venue-music.js"></script>
   <div id="venue-names" aria-hidden="true"></div>
   <div id="launch-event-tag">11.04 · 影目新品发布会</div>
   <div id="puzzle-pocket" class="hud-panel"><span>口袋</span><strong id="puzzle-key-status">没有钥匙</strong></div>
@@ -537,7 +539,7 @@
     }
 
     // =========================================================================
-    // 2. WEB AUDIO SYNTHESIZER (No external audio files needed)
+    // 2. Synthesized gameplay sound effects, separate from venue music.
     // =========================================================================
     const SoundFX = {
       ctx: null,
@@ -1446,6 +1448,7 @@
         return;
       }
       if (e.target.closest?.('input, textarea, [contenteditable="true"]')) return;
+      if ([' ', 'Enter'].includes(e.key) && e.target.closest?.('button, a, select')) return;
       const k = e.key.toLowerCase();
       if(opening.active){
         if(!e.repeat){if(k==='p')opening.pause(!opening.paused);else if([' ','enter','escape'].includes(k))opening.skip();}
@@ -1498,7 +1501,7 @@
 
     function toggleAudio() {
       SoundFX.enabled = !SoundFX.enabled;
-      document.getElementById('audio-btn-label').textContent = SoundFX.enabled ? '🔊 音效' : '🔇 静音';
+      document.getElementById('audio-btn-label').textContent = SoundFX.enabled ? '音效开启' : '音效关闭';
     }
 
     // Check if a point (px, pz) lies inside a 2D vision cone at (ox, oz) facing angle `dirAngle` with `range` & `fovHalf`
@@ -1748,6 +1751,8 @@
     const opening=LaunchIntro.create({THREE,renderer,player,onDone:()=>{
       clearInput();showToast('靠近头顶问号的人按 E 交谈；点击人物或物件可走近。',5000);
     }});
+    const venueMusic=VenueMusic.create({audio:document.getElementById('venue-music'),button:document.getElementById('btn-music-toggle'),
+      canPlay:()=>!opening.active&&gameState.status==='PLAYING'});
 
     renderer.domElement.addEventListener('pointerdown', (e) => {
       if(opening.active)return;
@@ -1928,6 +1933,7 @@
       requestAnimationFrame(animate);
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
+      venueMusic.update();
       if(opening.active){
         if(isPaused())opening.pause(true);
         opening.update(dt);

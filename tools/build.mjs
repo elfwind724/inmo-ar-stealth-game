@@ -9,12 +9,15 @@ execFileSync(process.execPath,[path.join(root,'node_modules/tailwindcss/lib/cli.
 let html=await fs.readFile(path.join(root,'index.html'),'utf8');
 html=html.replace('<script src="https://cdn.tailwindcss.com/3.4.17"></script>','<link rel="stylesheet" href="./assets/ui.css">').replace('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js','./vendor/three.min.js').replace(/^\s*<link[^>]+(?:fonts\.googleapis|fonts\.gstatic)[^>]*>\s*$/gm,'');
 await fs.writeFile(path.join(dist,'index.html'),html);
-const jsFiles=['game-rules.js','showroom-assets.js','launch-venue.js','launch-puzzle.js','launch-intro.js'];
+const jsFiles=['game-rules.js','showroom-assets.js','launch-venue.js','launch-puzzle.js','launch-intro.js','venue-music.js'];
 const cssFiles=['ui-polish.css','launch-event.css'];
 for(const file of [...jsFiles,...cssFiles])await fs.copyFile(path.join(root,file),path.join(dist,file));
 await fs.copyFile(path.join(root,'node_modules/three/build/three.min.js'),path.join(dist,'vendor/three.min.js'));
 await fs.copyFile(path.join(root,'node_modules/three/LICENSE'),path.join(dist,'vendor/THREE-LICENSE.txt'));
+const music=await fs.readFile(path.join(root,'assets/venue-bgm.mp3'));
+await fs.writeFile(path.join(dist,'assets/venue-bgm.mp3'),music);
 let standalone=html;
+standalone=standalone.replace('src="./assets/venue-bgm.mp3"',()=> 'src="data:audio/mpeg;base64,'+music.toString('base64')+'"');
 const inlineScript=code=>'<script>\n'+code.replace(/<\/script/gi,'<\\/script')+'\n</script>';
 for(const file of [...cssFiles,'assets/ui.css']){
   const css=await fs.readFile(path.join(dist,file),'utf8');

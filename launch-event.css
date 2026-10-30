@@ -16,9 +16,11 @@ html,body{background:#171c22;}
 #kit-content>button{position:relative;display:flex;flex-direction:column;align-items:start;text-align:left;width:100%;border:1px solid #b38b4940;background:#141d21b5;color:#e4d7bb;border-radius:6px;padding:8px 28px 8px 9px;margin-top:5px;gap:4px;}
 #kit-content b{font-size:11px;}#kit-content small{font-size:9px;line-height:1.5;color:#acb5b3;}#kit-content em{position:absolute;right:8px;top:10px;font:10px monospace;color:#eac486;}#kit-content button:disabled{opacity:.38;}
 #kit-content .kit-note{font-size:9px;color:#7d8b91;}
-#launch-bubbles{position:fixed;inset:0;z-index:16;pointer-events:none;overflow:hidden;}
-#launch-bubbles>span,.launch-bubble{position:absolute;transform:translate(-50%,-100%);max-width:170px;padding:6px 9px;border:1px solid #e3c99875;border-radius:7px;background:#fff0dceF;color:#382c24;font:10px/1.5 'Microsoft YaHei',sans-serif;box-shadow:0 4px 13px #0003;white-space:normal;}
-#launch-bubbles>span:after,.launch-bubble:after{content:'';position:absolute;bottom:-5px;left:45%;border:5px solid transparent;border-top-color:#fff0dc;border-bottom:0;}
+#launch-bubbles{position:fixed;inset:0;z-index:19;pointer-events:none;overflow:hidden;}
+#launch-bubbles>span,.launch-bubble{position:absolute;transform:translate(-50%,-100%);width:max-content;box-sizing:border-box;max-width:170px;padding:6px 9px;border:1px solid #e3c99875;border-radius:7px;background:#fff0dceF;color:#382c24;font:10px/1.5 'Microsoft YaHei',sans-serif;box-shadow:0 4px 13px #0003;white-space:normal;}
+#launch-bubbles>span:after,.launch-bubble:after{content:'';position:absolute;bottom:-5px;left:var(--bubble-tail,45%);transform:translateX(-50%);border:5px solid transparent;border-top-color:#fff0dc;border-bottom:0;}
+#btn-music-toggle{flex-shrink:0;font:10px/1.2 'Microsoft YaHei',sans-serif;padding:4px 6px;min-height:26px;white-space:nowrap;}
+.launch-bubble strong{display:block;margin-bottom:2px;color:#8c6838;font-size:9px;line-height:1.3;}
 #counter-tooltip{border-color:#bd945e;width:180px;}#tt-svg-holder{height:66px;background:#1a2529;border-color:#586363;}#tt-spec{display:block;font-size:9px;white-space:normal;line-height:1.5;}#tt-name,#tt-price,#tt-take-btn{color:#e9c78d;}
 #btn-quick-steal{bottom:114px;min-height:40px;padding:10px 13px;font-size:11px;border-color:#bc985d;background:#332d23ee;color:#f1cc94;}
 #modal-catalog a{color:#d7b381;}#catalog-grid{grid-template-columns:1fr;}#catalog-grid>div>div:first-child{background:#172329;}

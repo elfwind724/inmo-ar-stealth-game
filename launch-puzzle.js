@@ -13,7 +13,7 @@
     };
     const cover=linearMaterial(0x384b4a,{roughness:.83}),paper=linearMaterial(0xc4bba0,{roughness:.94});
     const metal=linearMaterial(0xc5a35a,{roughness:.28,metalness:.8,envMapIntensity:.85,emissive:0x000000});
-    let elapsed=0,dialogue=null;
+    let elapsed=0,dialogue=null,conversation=null;
     function box(parent,w,h,d,x,y,z,material){
       const mesh=new T.Mesh(new T.BoxGeometry(w,h,d),material);mesh.position.set(x,y,z);
       mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
@@ -47,12 +47,30 @@
       ...(receptionist?[{kind:'receptionist',actor:receptionist,label:'和签到接待员交谈',name:'签到接待员'}]:[]),
       ...(waiter?[{kind:'waiter',actor:waiter,label:'和服务员小周交谈',name:'服务员小周'}]:[])
     ];
+    const streamer=venue.people.find(p=>p.name==='周云飞'),emcee=venue.people.find(p=>p.name==='inmo小影');
+    const chats=[
+      ...(streamer?[{kind:'streamer-chat',actor:streamer,name:'周云飞',label:'找周云飞聊天',range:1.8,
+        approach:{x:4.45,z:-.95},lines:[
+          {speaker:'玩家',player:true,text:'云飞哥，我是你的粉丝，给我衣服上签个名吧。',duration:3.5},
+          {speaker:'周云飞',text:'来来来，拿去，你个小卡拉米。',duration:3.2}
+        ]}]:[]),
+      ...(emcee?[{kind:'emcee-chat',actor:emcee,name:'inmo小影',label:'和inmo小影聊天',range:2.35,
+        // Stand outside the low stage's front edge, clear of the hero cabinet.
+        approach:{x:3.9,z:-4.95},lines:[
+          {speaker:'玩家',player:true,text:'小影，你几点下班呀？',duration:2.7},
+          {speaker:'inmo小影',text:'你谁呀，走开，垃圾。',duration:3.2}
+        ]}]:[])
+    ];
     const targets=[{kind:'key',group:bookGroup,approach:keyApproach,interactionPoint:keyPoint,range:1.8,label:'查看来宾名册'}];
     for(const helper of helpers){
       const target={kind:helper.kind,group:helper.actor.group,range:2.0,label:helper.label};
       Object.defineProperty(target,'approach',{enumerable:true,get:()=>helper.kind==='receptionist'?{x:helper.actor.pos.x+1.1,z:helper.actor.pos.z-.7}:{x:helper.actor.pos.x+.95,z:helper.actor.pos.z+.50}});
       Object.defineProperty(target,'interactionPoint',{enumerable:true,get:()=>helper.actor.pos});
       targets.push(target);
+    }
+    for(const chat of chats){
+      const target={kind:chat.kind,group:chat.actor.group,range:chat.range,label:chat.label,approach:chat.approach};
+      Object.defineProperty(target,'interactionPoint',{enumerable:true,get:()=>chat.actor.pos});targets.push(target);
     }
 
     const markerCanvas=document.createElement('canvas');markerCanvas.width=96;markerCanvas.height=128;
@@ -66,6 +84,21 @@
       marker.scale.set(.46,.61,1);marker.renderOrder=12;group.add(marker);helper.marker=marker;
       targets.find(t=>t.kind===helper.kind).marker=marker;
     }
+    // A speech icon distinguishes optional banter from the gold question-mark clues.
+    const chatCanvas=document.createElement('canvas');chatCanvas.width=96;chatCanvas.height=128;
+    const chatCtx=chatCanvas.getContext('2d');chatCtx.fillStyle='rgba(25,34,35,.88)';chatCtx.strokeStyle='#94c5ca';chatCtx.lineWidth=3;
+    chatCtx.beginPath();chatCtx.arc(48,58,33,0,Math.PI*2);chatCtx.fill();chatCtx.stroke();
+    chatCtx.beginPath();chatCtx.moveTo(28,39);chatCtx.lineTo(68,39);chatCtx.quadraticCurveTo(73,39,73,44);chatCtx.lineTo(73,66);
+    chatCtx.quadraticCurveTo(73,71,68,71);chatCtx.lineTo(47,71);chatCtx.lineTo(35,80);chatCtx.lineTo(37,71);
+    chatCtx.lineTo(28,71);chatCtx.quadraticCurveTo(23,71,23,66);chatCtx.lineTo(23,44);chatCtx.quadraticCurveTo(23,39,28,39);chatCtx.stroke();
+    chatCtx.fillStyle='#c1e1df';for(const x of [36,48,60]){chatCtx.beginPath();chatCtx.arc(x,55,3,0,Math.PI*2);chatCtx.fill();}
+    const chatMap=new T.CanvasTexture(chatCanvas);chatMap.encoding=T.sRGBEncoding;
+    for(const chat of chats){
+      const marker=new T.Sprite(new T.SpriteMaterial({map:chatMap,transparent:true,depthTest:false,toneMapped:false}));
+      marker.scale.set(.44,.59,1);marker.renderOrder=12;group.add(marker);chat.marker=marker;
+      targets.find(t=>t.kind===chat.kind).marker=marker;
+    }
+    const markerRight=new T.Vector3();
 
     let bubbleNode=null;
     function ensureBubble(){
@@ -78,25 +111,49 @@
       }
       return bubbleNode;
     }
-    function speak(helper,text){
+    function showDialogue({speaker,text,actor=null,point=null,duration=4}){
       const node=ensureBubble();
-      dialogue={actor:helper?.actor||null,point:helper?null:{x:keyPoint.x,z:keyPoint.z,y:1.72},remaining:4};
-      if(node){node.textContent=(helper?helper.name+'：':'')+text;node.hidden=false;}
+      dialogue={actor,point,remaining:duration};
+      if(node){
+        node.replaceChildren();const title=document.createElement('strong');title.textContent=speaker;
+        const line=document.createElement('span');line.textContent=text;node.append(title,line);node.hidden=false;
+      }
+    }
+    function speak(helper,text){
+      showDialogue({speaker:helper?.name||'来宾名册',text,actor:helper?.actor||null,point:helper?null:{x:keyPoint.x,z:keyPoint.z,y:1.72}});
       if(typeof toast==='function')toast(text,4000);
+    }
+    function showConversationLine(){
+      const line=conversation.chat.lines[conversation.index];
+      showDialogue({speaker:line.speaker,text:line.text,actor:line.player?player:conversation.chat.actor,duration:line.duration});
+    }
+    function finishConversation(){
+      if(conversation)venue.setDialogueFocus?.(conversation.chat.actor,false);
+      conversation=null;dialogue=null;if(bubbleNode)bubbleNode.hidden=true;
+    }
+    function startConversation(chat,target){
+      conversation={chat,target,index:0};player.targetDest=null;player.path=[];
+      venue.setDialogueFocus?.(chat.actor,true,player.pos);showConversationLine();
     }
     function nearbyHint(){
       if(!allowed())return null;
+      if(conversation)return {label:'正在和'+conversation.chat.name+'交谈',kind:conversation.target.kind,target:conversation.target};
       const key=targets[0];
       if(!state.hasKey&&distance(player.pos,keyPoint)<=key.range)return {label:key.label,kind:key.kind,target:key};
-      const near=targets.slice(1).filter(t=>distance(player.pos,t.interactionPoint)<=t.range)
-        .sort((a,b)=>distance(player.pos,a.interactionPoint)-distance(player.pos,b.interactionPoint))[0];
+      const available=targets.slice(1).filter(t=>distance(player.pos,t.interactionPoint)<=t.range);
+      const helperKinds=new Set(helpers.map(h=>h.kind));
+      const near=available.sort((a,b)=>Number(helperKinds.has(b.kind))-Number(helperKinds.has(a.kind))||distance(player.pos,a.interactionPoint)-distance(player.pos,b.interactionPoint))[0];
       return near?{label:near.label,kind:near.kind,target:near}:null;
     }
     function interact(requested){
       if(!allowed())return false;
+      // Repeated E / clicks cannot skip the player line or replace the NPC reply.
+      if(conversation)return true;
       const requestedKind=typeof requested==='string'?requested:requested?.kind;
       const target=requestedKind?targets.find(t=>t.kind===requestedKind):nearbyHint()?.target;
       if(!target||distance(player.pos,target.interactionPoint)>target.range)return false;
+      const chat=chats.find(entry=>entry.kind===target.kind);
+      if(chat){startConversation(chat,target);if(sound?.enabled)sound.playTone(430,'sine',.05,.015,510);return true;}
       if(target.kind==='key'){
         state.inspected=true;
         if(state.hasKey){speak(null,'名册已经看过了，钥匙在你手里。');return true;}
@@ -119,7 +176,7 @@
     }
     function positionBubble(){
       const node=ensureBubble();if(!node||!dialogue)return;
-      const anchor=dialogue.actor?{...dialogue.actor.pos,y:2.85}:dialogue.point;
+      const actor=dialogue.actor,anchor=actor?{...actor.pos,y:actor===player?2.55:actor.group.position.y+2.85*actor.group.scale.y}:dialogue.point;
       const projected=new T.Vector3(anchor.x,anchor.y,anchor.z).project(camera);
       const width=window.innerWidth,height=window.innerHeight;
       const x=(projected.x*.5+.5)*width,y=(-projected.y*.5+.5)*height;
@@ -135,9 +192,23 @@
         helper.marker.position.set(helper.actor.pos.x,2.72+Math.sin(elapsed*2+helper.actor.id)*.035,helper.actor.pos.z);
         helper.marker.material.opacity=state.hasKey?.68:.92;
       }
-      if(dialogue){dialogue.remaining-=dt;if(dialogue.remaining<=0){dialogue=null;if(bubbleNode)bubbleNode.hidden=true;}else positionBubble();}
+      markerRight.set(1,0,0).applyQuaternion(camera.quaternion).multiplyScalar(1.25);
+      for(const chat of chats){
+        chat.marker.visible=!chat.actor.dialogueFocus;
+        chat.marker.position.set(chat.actor.pos.x+markerRight.x,chat.actor.group.position.y+2.6,chat.actor.pos.z+markerRight.z);
+        chat.marker.material.opacity=.82+Math.sin(elapsed*1.4+chat.actor.id)*.08;
+      }
+      if(dialogue){
+        dialogue.remaining-=dt;
+        if(dialogue.remaining<=0){
+          if(conversation&&++conversation.index<conversation.chat.lines.length)showConversationLine();
+          else finishConversation();
+        }
+        if(dialogue)positionBubble();
+      }
     }
     function reset(){
+      finishConversation();
       Object.assign(state,{hasKey:false,heardWaiter:false,heardReceptionist:false,inspected:false});elapsed=0;dialogue=null;keyModel.visible=true;
       if(bubbleNode)bubbleNode.hidden=true;
       update(0);
