@@ -218,7 +218,8 @@
   <script src="./game-rules.js"></script>
   <script src="./showroom-assets.js"></script>
   <script src="./launch-venue.js"></script>
-  <script src="./launch-tools.js"></script>
+  <script src="./launch-puzzle.js"></script>
+  <script src="./launch-intro.js"></script>
   <link rel="stylesheet" href="./launch-event.css">
 </head>
 <body>
@@ -411,18 +412,26 @@
   </div>
 
   <div id="launch-bubbles" aria-hidden="true"></div>
+  <div id="venue-names" aria-hidden="true"></div>
   <div id="launch-event-tag">11.04 · 影目新品发布会</div>
-  <div id="launch-kit" class="hud-panel"></div>
+  <div id="puzzle-pocket" class="hud-panel"><span>口袋</span><strong id="puzzle-key-status">没有钥匙</strong></div>
+  <div id="puzzle-dialogue" aria-live="polite"></div>
+  <section id="launch-opening" hidden aria-label="影目发布会开场">
+    <div id="opening-brand">inmo <span>影目</span></div>
+    <div id="opening-copy"><h2 id="opening-title">让信息<br>回到真实空间</h2><p id="opening-date">11.04　智能眼镜进入空间时代</p></div>
+    <button id="opening-skip" type="button">跳过开场</button>
+    <div id="opening-fade"></div>
+  </section>
 
   <div id="modal-pause" class="game-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
     <div class="dialog-card">
       <div class="dialog-kicker">INMO / STEALTH OPERATION</div>
       <h2 id="pause-title">行动已暂停</h2>
-      <p>目标是店内主舞台的神秘新品样机。正常走动安全，取镜时被镜头或人群看到就结束本局，只能重新来。</p>
+      <p>目标是店内主舞台的神秘新品样机。正常走动和交谈安全；开柜或取镜时被持续注意才会失败，移动可取消动作。</p>
       <div class="controls-grid"><div>屏幕方向移动 <kbd>WASD / ↑↓←→</kbd></div><div>取走样机 <kbd>E / 空格</kbd></div><div>慢走蹲姿 <kbd>Shift / C</kbd></div><div>暂停 / 继续 <kbd>Esc / P</kbd></div><div>重置视角 <kbd>V</kbd></div><div>重新开始 <kbd>R</kbd></div></div>
-      <p>点击展台走近后按 E，或使用伸缩钩远距离回收。饮料、服务员和舞台应援能制造空窗；移动会中断回收，鼠标滚轮不缩放。</p>
+      <p>靠近可交谈的人或可查看的物件，按 E 互动。展柜需要钥匙；开柜后再按 E 取镜。被注意时可以移动取消动作，鼠标滚轮不缩放。</p>
       <div class="settings-row"><button id="btn-crouch-toggle" class="hud-btn"><span id="crouch-btn-label">站立行走</span></button><button id="btn-reset-cam" class="hud-btn">45° 视角</button><button id="btn-audio-toggle" class="hud-btn"><span id="audio-btn-label">音效开启</span></button></div>
-      <div class="dialog-actions"><button id="btn-resume" class="primary-action">继续行动</button><button id="btn-restart-quick" class="hud-btn">重新开始</button></div>
+      <div class="dialog-actions"><button id="btn-resume" class="primary-action">继续行动</button><button id="btn-replay-opening" class="hud-btn">重看开场</button><button id="btn-restart-quick" class="hud-btn">重新开始</button></div>
     </div>
   </div>
   <div id="boot-status" class="game-dialog"><div class="dialog-card"><div class="dialog-kicker">INMO / LOADING</div><h2>正在准备展厅</h2><p id="boot-message">加载场景、柜台与监控设备…</p><button id="boot-reload" class="primary-action hidden">重新加载</button></div></div>
@@ -774,6 +783,13 @@
         const contactShadow=INMOAssets.contactShadow(THREE,4.8,3.35,.66);contactShadow.position.y=.027;cg.add(contactShadow);
         const rim = new THREE.Mesh(new THREE.BoxGeometry(3.24,.035,1.79),new THREE.MeshStandardMaterial({color:0xb0966d,metalness:.65,roughness:.3}));
         rim.position.y=1.28;cg.add(rim);
+        // A small visible keyhole makes the locked case readable in the scene.
+        const lockPlate=new THREE.Mesh(new THREE.BoxGeometry(.18,.25,.035),new THREE.MeshStandardMaterial({color:0xbba17a,metalness:.7,roughness:.3}));
+        lockPlate.position.set(1.25,.70,.90);cg.add(lockPlate);
+        const keyhole=new THREE.Mesh(new THREE.CircleGeometry(.037,12),new THREE.MeshBasicMaterial({color:0x10191d}));
+        keyhole.position.set(1.25,.735,.921);cg.add(keyhole);
+        const keySlot=new THREE.Mesh(new THREE.BoxGeometry(.035,.07,.012),new THREE.MeshBasicMaterial({color:0x10191d}));
+        keySlot.position.set(1.25,.69,.923);cg.add(keySlot);
         const foot = new THREE.Mesh(new THREE.BoxGeometry(3.0,.15,1.57),new THREE.MeshStandardMaterial({color:0x101d27,roughness:.55}));
         foot.position.y=.10;cg.add(foot);
 
@@ -865,6 +881,7 @@
           group: cg,
           glasses3D,
           vitrine,
+          glassEdges,
           ledStrip,
           highlightRing,
           baseMesh
@@ -1199,9 +1216,11 @@
     function buildPlayer() {
       const g = player.group;
       g.position.copy(player.pos);
+      // Match the launch crowd's visual scale; keep world position and movement separate.
+      g.scale.setScalar(0.86);
 
       // Glowing Green Selection Ring under Player's Feet (Exact match to Image 1)
-      const ringGeo = new THREE.RingGeometry(0.68, 0.85, 32);
+      const ringGeo = new THREE.RingGeometry(0.53, 0.65, 32);
       const ringMat = new THREE.MeshBasicMaterial({
         color: 0x4ade80,
         side: THREE.DoubleSide,
@@ -1341,7 +1360,7 @@
     buildClerk(); clerk.group.visible=false;
     buildPlayer();
     for(const character of [player.group,clerk.group]){
-      const shadow=INMOAssets.contactShadow(THREE,1.5,1.25,.58);shadow.position.y=.033;character.add(shadow);
+      const shadow=INMOAssets.contactShadow(THREE,character===player.group?1.2:1.5,character===player.group?1.0:1.25,.58);shadow.position.y=.033;character.add(shadow);
     }
     INMOAssets.linearizeScene(scene);
 
@@ -1356,11 +1375,11 @@
       exposure: 0, // 0..100 stealth exposure bar
       stealingTarget: null, // Counter object currently being stolen
       stealProgress: 0, // 0..1
-      STEAL_DURATION: 3.4, // Seconds to steal a pair of glasses
+      cabinetUnlocked:false, actionKind:'unlock', warned:false,
       nearestCounter: null,
       scoreSavedThisRun: false,
       runId: Date.now().toString(36),
-      resultBonus: 0, stealingMethod:'hands',stealDuration:3.4
+      resultBonus: 0, stealDuration:1.5
     };
 
     const keys = {};
@@ -1386,6 +1405,7 @@
       document.getElementById('pause-state').classList.toggle('hidden', !isPaused());
     }
     function manualPause(paused) {
+      if(opening.active){clearInput();opening.pause(paused);return;}
       if (gameState.status !== 'PLAYING') return;
       if (paused) modalReturnFocus = document.activeElement;
       setPaused('manual', paused);
@@ -1411,7 +1431,7 @@
       const active = !!gameState.stealingTarget;
       gameState.stealingTarget = null; gameState.stealProgress = 0;
       document.getElementById('tt-progress-wrap').classList.add('hidden');
-      if (active && message) showToast('已中断取镜，等待下一个盲区。');
+      if (active && message) showToast('动作已取消，先观察周围。');
     }
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Tab') {
@@ -1427,6 +1447,11 @@
       }
       if (e.target.closest?.('input, textarea, [contenteditable="true"]')) return;
       const k = e.key.toLowerCase();
+      if(opening.active){
+        if(!e.repeat){if(k==='p')opening.pause(!opening.paused);else if([' ','enter','escape'].includes(k))opening.skip();}
+        if([' ','enter','escape','p'].includes(k))e.preventDefault();
+        return;
+      }
       if (['arrowup','arrowdown','arrowleft','arrowright',' ','e','p','escape'].includes(k)) e.preventDefault();
       if (k === 'escape' || k === 'p') {
         if (e.repeat) return;
@@ -1439,7 +1464,7 @@
       if (e.repeat) return;
       SoundFX.init();
       if (k === 'shift' || k === 'c') toggleCrouch();
-      if (k === 'e' || k === ' ') tryStartStealing();
+      if (k === 'e' || k === ' ') interactNearby();
       if (k === 'v') resetCameraView();
       if (k === 'm') toggleAudio();
       if (k === 'r') restartGame();
@@ -1534,28 +1559,29 @@
       else showToast('没有可走近的路线，请换一侧靠近。');
     }
 
-    function tryStartStealing(specificCounter,method='hands') {
-      if (gameState.status !== 'PLAYING' || isPaused()) return;
-      const target = specificCounter || gameState.nearestCounter;
-      if (!target || target.data.stolen) return;
-
-      const dx = player.pos.x - target.data.pos.x;
-      const dz = player.pos.z - target.data.pos.z;
-      const dist = Math.hypot(dx, dz);
-
-      if (dist <= (method==='hook'?6.2:2.65)) {
-        if (gameState.stealingTarget !== target) {
-          player.targetDest = null; player.path = [];
-          clickMarker.material.opacity = 0;
-          gameState.stealingTarget = target;
-          gameState.stealProgress = 0; gameState.stealingMethod=method;gameState.stealDuration=method==='hook'?4.6:3.4;
-          SoundFX.stealTick(); return true;
-        }
-      } else {
-        // Walk up first; the player confirms a safe moment after arriving.
-        if(method==='hook')navigateTo({x:0,z:.15},'伸缩钩操作位');else highlightAndNavigateToCounter(target.data);
-        showToast(method==='hook'?'先走近伸缩钩操作位，再点一次使用。':'走近后按 E 取镜。');
-      }
+    function interactNearby(){
+      if(gameState.status!=='PLAYING'||isPaused())return;
+      if(!gameState.stealingTarget&&puzzle.interact())return;
+      tryStartStealing();
+    }
+    function tryStartStealing(specificCounter) {
+      if(gameState.status!=='PLAYING'||isPaused()||gameState.stealingTarget)return;
+      const target=specificCounter||gameState.nearestCounter;
+      if(!target||target.data.stolen)return;
+      const dist=Math.hypot(player.pos.x-target.data.pos.x,player.pos.z-target.data.pos.z);
+      if(dist>2.65){highlightAndNavigateToCounter(target.data);return;}
+      if(!puzzle.state.hasKey){showToast('展柜锁着，需要找到钥匙。');return;}
+      player.targetDest=null;player.path=[];clickMarker.material.opacity=0;
+      gameState.actionKind=gameState.cabinetUnlocked?'take':'unlock';
+      gameState.stealDuration=gameState.cabinetUnlocked?1.0:1.5;
+      gameState.stealingTarget=target;gameState.stealProgress=0;gameState.warned=false;
+      SoundFX.stealTick();
+    }
+    function completeUnlock(target){
+      gameState.cabinetUnlocked=true;gameState.stealingTarget=null;gameState.stealProgress=0;
+      target.vitrine.position.y=2.6;target.glassEdges.position.y=2.6;
+      SoundFX.playTone(760,'triangle',.12,.07,1100);
+      renderMissionListUI();showToast('柜门打开了。按 E 取回眼镜。');
     }
 
     function completeSteal(counterObj) {
@@ -1569,7 +1595,7 @@
 
       // Hide 3D glasses on counter and dim LED underglow
       counterObj.glasses3D.visible = false;
-      counterObj.vitrine.position.y = 2.05;
+      counterObj.vitrine.position.y = 2.6; counterObj.glassEdges.position.y=2.6;
       counterObj.vitrine.material.opacity = 0.08;
       counterObj.ledStrip.material.color.setHex(0x10b981);
 
@@ -1585,7 +1611,7 @@
 
     function triggerGameOver(reasonText) {
       if (gameState.status !== 'PLAYING') return;
-      gameState.status = 'GAMEOVER';launchTools.update(0,null,'hands');document.getElementById('launch-bubbles').style.opacity='0';
+      gameState.status = 'GAMEOVER';document.getElementById('launch-bubbles').style.opacity='0';
       gameState.stealingTarget = null;
       player.targetDest = null;
       SoundFX.caughtSiren();
@@ -1595,7 +1621,7 @@
 
     function triggerVictory() {
       if (gameState.status !== 'PLAYING') return;
-      gameState.status = 'VICTORY';launchTools.update(0,null,'hands');document.getElementById('launch-bubbles').style.opacity='0';
+      gameState.status = 'VICTORY';document.getElementById('launch-bubbles').style.opacity='0';
       gameState.stealingTarget = null;
       player.targetDest = null;
       SoundFX.victoryFanfare();
@@ -1658,7 +1684,7 @@
     }
 
     function restartGame() {
-      launchVenue.reset(); launchTools.reset();document.getElementById('launch-bubbles').style.opacity='1';
+      launchVenue.reset(); puzzle.reset();gameState.cabinetUnlocked=false;gameState.actionKind='unlock';document.getElementById('launch-bubbles').style.opacity='1';
       gameState.status = 'PLAYING'; pauseReasons.clear(); clearInput();
       camYawOffset=0; cameraTarget.set(0,.5,1.5);
       player.path = []; clerk.route = []; gameState.nearestCounter = null;
@@ -1671,7 +1697,7 @@
       GLASSES_DATA.forEach(item => { item.stolen = false; });
       counterMeshes.forEach(cm => {
         cm.glasses3D.visible = true;
-        cm.vitrine.position.y = 1.78;
+        cm.vitrine.position.y = 1.78; cm.glassEdges.position.y=1.78;
         cm.vitrine.material.opacity = .045;
         cm.ledStrip.material.color.setHex(0xe6ba73);
       });
@@ -1707,7 +1733,7 @@
       document.getElementById('modal-endgame').classList.remove('flex');
 
       renderMissionListUI();
-      showToast('发布会重新开始 · 拿到主舞台样机。道具与筹码已补充。');
+      showToast('新的一局开始，先寻找展柜钥匙。');
     }
 
     // =========================================================================
@@ -1717,11 +1743,14 @@
     const mouseNDC = new THREE.Vector2();
     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-    const launchTools=LaunchTools.create({THREE,scene,player,venue:launchVenue,navigate:navigateTo,toast:showToast,
-      sound:SoundFX,canAct:()=>gameState.status==='PLAYING'&&!isPaused(),
-      onHook:()=>tryStartStealing(counterMeshes[0],'hook')});
+    const puzzle=LaunchPuzzle.create({THREE,scene,player,venue:launchVenue,camera,toast:showToast,sound:SoundFX,
+      canAct:()=>gameState.status==='PLAYING'&&!isPaused()});
+    const opening=LaunchIntro.create({THREE,renderer,player,onDone:()=>{
+      clearInput();showToast('靠近头顶问号的人按 E 交谈；点击人物或物件可走近。',5000);
+    }});
 
     renderer.domElement.addEventListener('pointerdown', (e) => {
+      if(opening.active)return;
       if (gameState.status !== 'PLAYING' || isPaused()) return;
       SoundFX.init();
       if (e.button === 2 || e.button === 1) {
@@ -1737,14 +1766,24 @@
       mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouseNDC, camera);
 
-      // Check if user clicked on one of the 6 counters
+      const clueHits=raycaster.intersectObjects(puzzle.targets.flatMap(t=>t.marker?[t.group,t.marker]:[t.group]),true);
+      if(clueHits.length){
+        const selected=puzzle.targets.find(t=>t.group.getObjectById(clueHits[0].object.id)||t.marker===clueHits[0].object);
+        if(selected){
+          if(Math.hypot(player.pos.x-selected.interactionPoint.x,player.pos.z-selected.interactionPoint.z)>selected.range)
+            navigateTo(selected.approach,selected.kind==='key'?'可查看的名册':'可交谈的人');
+          else puzzle.interact(selected);
+          return;
+        }
+      }
+      // Click the cabinet to approach; E confirms the interaction.
       const counterBoxes = counterMeshes.map(c => c.group);
       const hits = raycaster.intersectObjects(counterBoxes, true);
       if (hits.length > 0) {
         const hitMesh = hits[0].object;
         const foundCounter = counterMeshes.find(c => c.group.getObjectById(hitMesh.id));
         if (foundCounter && !foundCounter.data.stolen) {
-          tryStartStealing(foundCounter);
+          highlightAndNavigateToCounter(foundCounter.data);
           return;
         }
       }
@@ -1797,9 +1836,9 @@
     function updateStealthUI(inRedCam,inCrowd) {
       const danger=inRedCam||inCrowd;
       document.getElementById('player-zone-label').textContent=player.pos.z<6?'新品体验区':'发布广场';
-      document.getElementById('stealth-badge').textContent=danger?'有人注意 · 暂勿动手':'注意力空窗 · 可行动';
-      document.getElementById('stealth-status-text').textContent=danger?'镜头或人群能看到你。取镜时被看见，本局结束。':'正常走动不会被抓。观察安保、玩手机与演出应援的时机。';
-      document.querySelectorAll('#stealth-bars .stealth-seg').forEach((s,i)=>s.style.background=i<(danger?8:3)?(danger?'#e98261':'#80b6a4'):'#343b3a');
+      document.getElementById('stealth-badge').textContent=gameState.exposure>30?'警觉上升 · 先走开':danger?'视线内 · 先观察':'暂时无人注意';
+      document.getElementById('stealth-status-text').textContent='正常走动安全。开柜或取镜时警觉条会累积，移动可取消动作。';
+      document.querySelectorAll('#stealth-bars .stealth-seg').forEach((s,i)=>s.style.background=i<Math.max(2,Math.ceil(gameState.exposure/12.5))?(danger?'#e98261':'#80b6a4'):'#343b3a');
       player.ringMesh.material.color.setHex(danger?0xe5a85c:0x80c3a5);
     }
 
@@ -1889,6 +1928,11 @@
       requestAnimationFrame(animate);
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
+      if(opening.active){
+        if(isPaused())opening.pause(true);
+        opening.update(dt);
+        if(opening.active){renderer.render(opening.scene,opening.camera);return;}
+      }
 
 
       if (gameState.status === 'PLAYING' && !isPaused()) {
@@ -2021,15 +2065,11 @@
         // -------------------------------------------------------------------
         // C. Audience, media and patrol security.
         launchVenue.update(dt,player.pos);
-        let crowdWitness=launchVenue.witness(player.pos);
-        if(gameState.stealingTarget&&gameState.stealingMethod==='hook'){
-          const p=gameState.stealingTarget.data.pos;
-          crowdWitness=crowdWitness||launchVenue.witness({x:p.x,z:p.z+1});
-          for(const cam of securityCameras)if(isPointInVisionCone(p.x,p.z,cam.cfg.mountPos.x,cam.cfg.mountPos.z,cam.currentAngle,cam.cfg.range,cam.cfg.fovHalf))caughtByCam=cam.cfg;
-        }
+        const crowdWitness=launchVenue.witness(player.pos);
         const caughtByClerk=Boolean(crowdWitness);
         clerkBubbleEl.classList.add('hidden');
-        launchTools.update(dt,gameState.stealingTarget,gameState.stealingMethod);
+        puzzle.update(dt);
+        document.getElementById('puzzle-key-status').textContent=puzzle.state.hasKey?'展柜钥匙 ✓':'没有钥匙';
 
         // D. PROXIMITY TO COUNTERS & STEALING PROGRESS
         // -------------------------------------------------------------------
@@ -2079,29 +2119,34 @@
           tooltipEl.classList.add('hidden');
           quickStealBtn.classList.add('hidden');
           quickStealBtn.classList.remove('flex');
-          if(gameState.stealingMethod!=='hook')cancelSteal(false);
+          cancelSteal(false);
         }
 
-        const progWrap = document.getElementById('tt-progress-wrap');
-        const progBar = document.getElementById('tt-progress-bar');
-        const seen = Boolean(caughtByCam || caughtByClerk);
-        gameState.exposure = seen ? 65 : Math.max(0,gameState.exposure-90*dt);
-        if (gameState.stealingTarget) {
-          const target = gameState.stealingTarget;
-          const state = GameRules.advanceSteal(gameState.stealProgress,dt,gameState.stealDuration,seen,player.isMoving);
-          if (state.outcome === 'caught') {
-            gameState.exposure=100;
-            triggerGameOver('取走 ' + target.data.name + ' 时，被' + (caughtByCam ? caughtByCam.name : crowdWitness.name) + '看见了。');
-            progWrap.classList.add('hidden');
-          } else if (state.outcome === 'cancelled') cancelSteal(true);
-          else {
-            gameState.stealProgress=state.progress; progWrap.classList.remove('hidden');
-            progBar.style.width=(state.progress*100).toFixed(1)+'%';
-            if (state.outcome === 'complete') { progWrap.classList.add('hidden'); completeSteal(target); }
+        const progWrap=document.getElementById('tt-progress-wrap');
+        const progBar=document.getElementById('tt-progress-bar');
+        const seen=Boolean(caughtByCam||caughtByClerk);
+        if(gameState.stealingTarget){
+          const target=gameState.stealingTarget;
+          if(player.isMoving){cancelSteal(true);gameState.exposure=Math.max(0,gameState.exposure-150*dt);}
+          else{
+            gameState.exposure=seen?Math.min(100,gameState.exposure+dt*100/1.2):Math.max(0,gameState.exposure-170*dt);
+            if(gameState.exposure>30&&!gameState.warned){gameState.warned=true;showToast('有人开始注意你了，移动可先取消动作。',1800);}
+            if(gameState.exposure>=100){
+              triggerGameOver((gameState.actionKind==='unlock'?'开柜':'取镜')+'时，被'+(caughtByCam?caughtByCam.name:crowdWitness.name)+'持续注意到了。');
+              progWrap.classList.add('hidden');
+            }else{
+              gameState.stealProgress=Math.min(1,gameState.stealProgress+dt/gameState.stealDuration);
+              progWrap.classList.remove('hidden');progBar.style.width=(gameState.stealProgress*100)+'%';
+              if(gameState.stealProgress>=1){progWrap.classList.add('hidden');if(gameState.actionKind==='unlock')completeUnlock(target);else completeSteal(target);}
+            }
           }
-        } else progWrap.classList.add('hidden');
-        document.getElementById('tt-take-btn').querySelector('span').textContent=gameState.stealingTarget?(gameState.stealingMethod==='hook'?'回收钩线中 · 移动会中断':'取镜中 · 移动可中断'):'取走样机 · 约 3.4 秒';
-        document.getElementById('btn-quick-steal').textContent=gameState.stealingTarget?'取镜中…':'取走样机';
+        }else{gameState.exposure=Math.max(0,gameState.exposure-150*dt);progWrap.classList.add('hidden');}
+        const actionText=gameState.stealingTarget?(gameState.actionKind==='unlock'?'开锁中 · 移动可取消':'取镜中 · 移动可取消'):
+          !puzzle.state.hasKey?'柜门锁着 · 需要钥匙':gameState.cabinetUnlocked?'取回眼镜 · E':'用钥匙开柜 · E';
+        document.getElementById('tt-take-btn').querySelector('span').textContent=actionText;
+        const clue=puzzle.nearbyHint();
+        if(clue&&!gameState.stealingTarget){quickStealBtn.classList.remove('hidden');quickStealBtn.classList.add('flex');quickStealBtn.textContent=clue.label+' · E';}
+        else quickStealBtn.textContent=actionText;
 
         // Update footstep puffs
         stepPuffs.forEach((p) => {
@@ -2146,7 +2191,7 @@
     });
 
     document.getElementById('btn-quick-steal').addEventListener('click', () => {
-      tryStartStealing();
+      interactNearby();
     });
 
     document.getElementById('btn-crouch-toggle').addEventListener('click', () => {
@@ -2171,6 +2216,9 @@
     document.getElementById('btn-restart-quick').addEventListener('click',restartGame);
     document.getElementById('btn-pause').addEventListener('click',()=>manualPause(true));
     document.getElementById('btn-resume').addEventListener('click',()=>manualPause(false));
+    document.getElementById('btn-replay-opening').addEventListener('click',()=>{
+      manualPause(false);clearInput();opening.start();
+    });
     document.getElementById('btn-toggle-map').addEventListener('click',()=>{
       const map=document.getElementById('minimap-panel'),collapsed=map.classList.toggle('collapsed');
       document.getElementById('btn-toggle-map').setAttribute('aria-expanded',String(!collapsed));drawMinimap();
@@ -2247,16 +2295,18 @@
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(Math.min(window.devicePixelRatio,window.innerWidth<700?1.5:2));
       renderer.setSize(window.innerWidth, window.innerHeight);
+      opening.resize();
     });
 
     window.onload = () => {
       if(window.gameBootFailed) return;
       document.getElementById('boot-status').classList.add('hidden');
       try{document.getElementById('player-name-input').value=localStorage.getItem('inmo_player_name')||'潜行者';}catch{}
-      showToast('广场正在暖场。进入店内拿样机；道具里有伸缩钩、饮料和服务员路线。',6500);
+      showToast('靠近头顶问号的人按 E 交谈；可点击人物或物件走近。',6500);
       drawMinimap();
       renderMissionListUI();
       renderLeaderboardModal();
+      opening.start();
       requestAnimationFrame(animate);
     };
   </script>

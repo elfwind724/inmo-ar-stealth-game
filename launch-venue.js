@@ -4,9 +4,9 @@
   function build({THREE:T,scene,assets,makeTextTexture,addCollider,camera,sound}) {
     const group=new T.Group();group.name='inmo-launch-venue';scene.add(group);
     const people=[],dancers=[],floaters=[],bubbles=[];
-    const effects={drinkUntil:0,bribeUntil:0,showUntil:0};
     let elapsed=0,nextBubble=2.5,bubbleIndex=0,lastCheer=-1;
-    const stations={drink:{x:-4.7,z:3.3,name:'饮料台'},waiter:{x:-4.6,z:1.2,name:'服务员'},show:{x:10.4,z:5.0,name:'应援控制台'}};
+    let nextEmcee=1,nextLyric=15,nextStream=17,emceeLine=0,lyricLine=0,streamLine=0,storyCycle=-1,storyCue=-1;
+    const stations={drink:{x:-4.7,z:3.3,name:'饮料台'},waiter:{x:-4.6,z:1.2,name:'服务员'},show:{x:10.4,z:5.0,name:'现场调音台'}};
     const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
     const geometry={box:new T.BoxGeometry(1,1,1),sphere:new T.SphereGeometry(.5,12,8),cylinder:new T.CylinderGeometry(.5,.5,1,12)};
     const M=(color,roughness=.62,metalness=0)=>new T.MeshStandardMaterial({color,roughness,metalness});
@@ -105,7 +105,7 @@
     }
     stationTable('drink','#d9b87b','发布会饮料');
     for(const x of [-.36,0,.36]){cylinder(group,.10,.25,stations.drink.x+x,1.10,stations.drink.z,palette.white);cylinder(group,.09,.018,stations.drink.x+x,1.235,stations.drink.z,M(0xc19651));}
-    stationTable('show','#efc47e','现场应援');block(group,.72,.035,.40,stations.show.x,1.01,stations.show.z,palette.screen);
+    stationTable('show','#efc47e','现场调音');block(group,.72,.035,.40,stations.show.x,1.01,stations.show.z,palette.screen);
     // Outdoor warm-up stage sits to the right, leaving the entrance and street clear.
     const stage=new T.Group();stage.position.set(8.5,0,9.1);group.add(stage);
     block(stage,7,.42,3.2,0,.21,0,palette.ink);block(stage,7.05,.045,.08,0,.43,1.59,palette.goldGlow,false);addCollider(8.5,9.1,7.15,3.35);
@@ -127,11 +127,13 @@
     // Shared geometry and materials keep the larger crowd affordable to render.
     function person({x,z,role='guest',index=0,seated=false,look='product',adultDancer=false,name}){
       const g=new T.Group(),body=new T.Group();g.add(body);group.add(g);
-      const uniform=role==='security'?M(0x26323e):role==='waiter'?M(0x493c37):palette.clothes[index%palette.clothes.length];
+      const isOfficer=role==='security'||role==='stage-security';
+      const uniform=isOfficer?M(0x26323e):role==='waiter'?M(0x493c37):palette.clothes[index%palette.clothes.length];
       const skin=palette.skin[index%palette.skin.length],hair=palette.hair[index%palette.hair.length];
       const p={id:people.length,name:name||({security:'巡场安保',media:'摄影记者',waiter:'服务员'}[role]||'发布会来宾'),role,
         group:g,body,pos:{x,z},home:{x,z},seated,look,angle:Math.PI,lookAngle:Math.PI,phase:index*.93,mode:'WATCH',observing:false,
-        range:role==='security'?6.2:role==='media'?4.3:3.5,halfFov:role==='security'?.30:.26,route:[],routeIndex:0,detour:null};
+        range:role==='security'?6.2:role==='media'?4.3:3.5,halfFov:role==='security'?.30:.26,route:[],routeIndex:0,
+        attentionPeriod:role==='security'?(people.length%2===0?17.3:23.7):19+(people.length%5-2)*.4};
       const hipY=adultDancer?1.03:.92;
       function leg(side){const hip=new T.Group();hip.position.set(side*.16,hipY,0);body.add(hip);
         cylinder(hip,.115,.38,0,-.19,0,adultDancer?skin:palette.ink);
@@ -142,7 +144,7 @@
       if(adultDancer){
         const skirt=new T.Mesh(new T.CylinderGeometry(.30,.48,.72,12),uniform);skirt.position.y=1.02;skirt.castShadow=true;body.add(skirt);
         block(body,.61,.055,.43,0,1.22,0,palette.brass);
-      }else if(role==='security'){
+      }else if(isOfficer){
         block(body,.60,.56,.08,0,1.37,.235,palette.ink);block(body,.10,.13,.02,-.18,1.57,.285,palette.brass);
       }else if(role==='waiter')block(body,.48,.55,.045,0,1.15,.23,palette.white);
       else{block(body,.018,.18,.018,0,1.55,.22,palette.white);block(body,.18,.12,.02,0,1.44,.23,palette.white);}
@@ -153,7 +155,7 @@
       const head=new T.Group();head.position.set(0,adultDancer?2.02:1.99,0);body.add(head);p.head=head;
       sphere(head,adultDancer?.41:.46,.49,.43,0,0,0,skin);sphere(head,.46,.30,.46,0,.18,-.03,hair);
       if(adultDancer){sphere(head,.19,.20,.20,0,.29,-.14,hair);cylinder(head,.038,.30,.18,-.02,0,palette.brass);}
-      if(role==='security'){block(head,.53,.12,.49,0,.25,0,palette.ink);block(head,.43,.035,.16,0,.18,.27,palette.black);}
+      if(isOfficer){block(head,.53,.12,.49,0,.25,0,palette.ink);block(head,.43,.035,.16,0,.18,.27,palette.black);}
       p.eyes=[];for(const dx of [-.105,.105])p.eyes.push(sphere(head,.045,.035,.025,dx,.025,.21,palette.eyes));
       const phone=block(p.armR.elbow,.15,.025,.27,0,-.30,.09,palette.black);block(phone,.82,.09,.82,0,.56,0,palette.screen,false);phone.visible=false;p.phone=phone;
       if(role==='media'){
@@ -165,7 +167,7 @@
         block(chair,.87,.11,.78,0,.48,0,palette.ink);block(chair,.87,.66,.10,0,.86,-.35,palette.ink);
         for(const dx of [-.33,.33])for(const dz of [-.28,.28])cylinder(chair,.025,.48,dx,.24,dz,palette.copper);
         chair.rotation.y=Math.PI;addCollider(x,z,1.0,.95);
-      }else if(!adultDancer&&role!=='security'&&role!=='waiter')addCollider(x,z,.52,.52);
+      }else if(!adultDancer&&!isOfficer&&role!=='waiter')addCollider(x,z,.52,.52);
       const shadow=assets.contactShadow(T,.95,.85,.35);shadow.position.set(x,.029,z);group.add(shadow);p.shadow=shadow;
       p.baseY=seated?-.39:0;g.position.set(x,p.baseY,z);people.push(p);return p;
     }
@@ -185,6 +187,49 @@
       const p=person({x:6.0+i*1.6,z:9.35,index:3+i,adultDancer:true,role:'dancer',look:'performance',name:'成年暖场舞者'});
       p.phase=i*Math.PI/2;p.baseY=.43;p.group.scale.setScalar(1.04);dancers.push(p);
     }
+    // These four names belong only to the performance cast, independently of the
+    // service / reception actors used by the key puzzle.
+    const mo=dancers[dancers.length-1];mo.name='小mo';
+    const heckler=people.find(p=>p.role==='guest'&&p.home.x===12.5&&p.home.z===10.8);heckler.name='韦爵爷';
+    const streamer=people.find(p=>p.role==='media'&&p.home.x>0);streamer.name='周云飞';streamer.cameraProp.visible=false;
+    const selfieStick=new T.Group();selfieStick.position.set(0,-.31,.08);streamer.armR.elbow.add(selfieStick);
+    cylinder(selfieStick,.018,.88,0,-.42,0,palette.chrome);
+    block(selfieStick,.25,.39,.045,0,-.93,0,palette.black);
+    block(selfieStick,.21,.33,.012,0,-.93,-.028,palette.screen,false);
+    streamer.selfieStick=selfieStick;
+    const emcee=person({x:3.9,z:-7.2,role:'emcee',adultDancer:true,index:4,look:'audience',name:'inmo小影'});
+    emcee.baseY=-.05;emcee.group.scale.setScalar(1.04);
+    const microphone=new T.Group();microphone.position.set(0,-.28,.08);emcee.armR.elbow.add(microphone);
+    cylinder(microphone,.040,.26,0,-.09,0,palette.chrome);sphere(microphone,.15,.17,.15,0,-.28,0,palette.black);emcee.microphone=microphone;
+    const stageMarshal=person({x:13.45,z:10.95,role:'stage-security',index:6,look:'performance',name:'舞台秩序保安'});
+    const namedActors=[{actor:emcee,label:'inmo小影'},{actor:mo,label:'小mo'},{actor:heckler,label:'韦爵爷'},{actor:streamer,label:'周云飞'}];
+    for(const entry of namedActors)entry.actor.hasNameplate=true;
+    const emceeLines=[
+      '欢迎来到影目新品发布会，掌声借我一点！',
+      '智能眼镜，进入空间时代——一起期待正式揭晓！',
+      '看展请排队，体验请按现场指引。',
+      '前排看得到，后排的热情我也听得到！',
+      '把期待交给舞台，把掌声送给每位观众！',
+      '新品信息以正式发布为准，精彩先在现场相见！',
+      '灯光准备，掌声准备，一起迎接新的空间想象！'
+    ];
+    const lyricLines=[
+      '影目开场，心里有光；跟着节拍，把笑容点亮。',
+      '向前一步，换个角度；影目相伴，想象不走旧路。',
+      '掌声成海，节拍澎湃；影目舞台，期待一起盛开。',
+      '眼前有光，脚步有方向；影目在场，快乐一起登场。',
+      '看见远方，心里有光；跟着影目，把好心情收藏。',
+      '节拍开麦，笑容满载；影目在这里，等你一起喝彩。'
+    ];
+    const streamLines=[
+      '家人们，影目现场已经把氛围拉满了！',
+      '我是周云飞，镜头先对准这份期待。',
+      '不抢前排，先把直播间的掌声刷起来。',
+      '今天只聊现场感受，参数等正式公布。',
+      '大屏有空间，手机有画面，大家有笑脸。',
+      '前排看眼镜，后排跟我云逛展。',
+      '跟着我绕一圈，排队也有发布会的仪式感。'
+    ];
     // Guards have readable floor fans; regular guests indicate attention through their actions.
     function fan(range,half){
       const points=[0,.045,0];for(let i=0;i<=28;i++){const a=-half+2*half*i/28;points.push(Math.sin(a)*range,.045,Math.cos(a)*range);}
@@ -202,11 +247,79 @@
       '摄影老师，能给我的黑眼圈打点光吗？','掌声给新品，手机电量留给返程。','我的手在鼓掌，我的脑子在想续航。','舞台很稳，我的拍照手不太稳。',
       '这里没有普通观众，都是未来体验官。','先别问多少钱，先让我多看两眼。','签到了，但还没签到前排。','请给后排朋友一点点未来视野。'
     ];
-    function bubble(p,text,duration=2.8){
+    function bubble(p,text,duration=2.8,priority=0){
       const container=document.getElementById('launch-bubbles');if(!container||!camera)return;
-      while(bubbles.length>=3){const old=bubbles.shift();old.node.remove();}
+      if(bubbles.length>=3){
+        let replace=0;for(let i=1;i<bubbles.length;i++)if(bubbles[i].priority<bubbles[replace].priority)replace=i;
+        if(bubbles[replace].priority>priority)return;
+        bubbles[replace].node.remove();bubbles.splice(replace,1);
+      }
       const node=document.createElement('span');node.className='launch-bubble';node.textContent=text;container.appendChild(node);
-      bubbles.push({person:p,node,life:duration});
+      node.dataset.priority=String(priority);bubbles.push({person:p,node,life:duration,priority});
+    }
+    function say(p,text,duration=3.1,priority=1){p.speakingUntil=elapsed+duration;bubble(p,text,duration,priority);}
+    function updateNameplates(){
+      const container=document.getElementById('venue-names');if(!container||!camera)return;
+      for(const entry of namedActors){
+        if(!entry.node||entry.node.parentNode!==container){entry.node=document.createElement('span');entry.node.textContent=entry.label;container.appendChild(entry.node);}
+        const p=entry.actor,position=new T.Vector3(p.group.position.x,p.group.position.y+2.55*p.group.scale.y,p.group.position.z).project(camera);
+        const x=(position.x*.5+.5)*window.innerWidth,y=(-position.y*.5+.5)*window.innerHeight;
+        entry.node.hidden=!group.visible||position.z>1||x<26||x>window.innerWidth-26||y<65||y>window.innerHeight-24;
+        entry.node.style.left=x+'px';entry.node.style.top=y+'px';
+      }
+    }
+    function updatePerformance(){
+      const phase=elapsed%28,loop=Math.floor(elapsed/28);
+      if(loop!==storyCycle){storyCycle=loop;storyCue=-1;}
+      const cues=[
+        {at:3.1,actor:heckler,text:'小mo，韦爵爷想摸摸你的手！',duration:2.9},
+        {at:6.25,actor:stageMarshal,text:'流氓，冷静点',duration:3.2},
+        {at:10.1,actor:heckler,text:'我冷静，手也冷静，先看演出！',duration:3.0},
+        {at:13.2,actor:stageMarshal,text:'看演出可以，请保持距离。',duration:2.7}
+      ];
+      for(let i=0;i<cues.length;i++)if(i>storyCue&&phase>=cues[i].at){const cue=cues[i];say(cue.actor,cue.text,cue.duration,3);storyCue=i;}
+      const close=clamp((phase-3)/3.1,0,1)*(1-clamp((phase-14)/3,0,1));
+      const ease=close*close*(3-2*close);
+      stageMarshal.pos.x=stageMarshal.home.x+(12.75-stageMarshal.home.x)*ease;
+      stageMarshal.pos.z=stageMarshal.home.z+(10.4-stageMarshal.home.z)*ease;
+      stageMarshal.group.position.set(stageMarshal.pos.x,0,stageMarshal.pos.z);stageMarshal.shadow.position.set(stageMarshal.pos.x,.029,stageMarshal.pos.z);
+      const towardsGuest=Math.atan2(heckler.pos.x-stageMarshal.pos.x,heckler.pos.z-stageMarshal.pos.z);
+      stageMarshal.body.rotation.y=towardsGuest;stageMarshal.phone.visible=false;stageMarshal.observing=false;
+      stageMarshal.body.position.y=0;stageMarshal.armL.shoulder.rotation.set(-.1,0,.08);stageMarshal.armR.shoulder.rotation.set(-.1,0,-.08);
+      stageMarshal.armL.elbow.rotation.set(0,0,0);stageMarshal.armR.elbow.rotation.set(0,0,0);
+      const holding=phase>=6.2&&phase<14;
+      if(holding){
+        stageMarshal.armL.shoulder.rotation.set(-1.1,0,.48);stageMarshal.armL.elbow.rotation.set(-.2,0,-.5);
+        stageMarshal.armR.shoulder.rotation.set(-1.0,0,-.2);stageMarshal.armR.elbow.rotation.set(-.7,0,.28);
+        stageMarshal.head.rotation.y=.12;
+      }
+      const reaching=phase>=5.5&&phase<6.65,quiet=phase>=7.1&&phase<15;
+      heckler.body.rotation.y=Math.atan2(mo.home.x-heckler.home.x,mo.home.z-heckler.home.z);
+      heckler.phone.visible=false;heckler.observing=false;
+      if(phase>=3&&phase<5.5){heckler.armR.shoulder.rotation.set(-1.0-Math.sin(elapsed*8)*.12,0,-.45);heckler.armR.elbow.rotation.x=-.7;}
+      if(reaching){heckler.armR.shoulder.rotation.set(-1.35,0,-.18);heckler.armR.elbow.rotation.set(-.15,0,.1);}
+      if(quiet){
+        heckler.body.rotation.x=-.10;heckler.armR.shoulder.rotation.set(-.22,0,-.15);heckler.armL.shoulder.rotation.set(-.22,0,.15);
+        heckler.head.rotation.y=Math.sin(elapsed*.8)*.06;
+      }
+      // These are separate performance lines, not puzzle clues or product claims.
+      const dialogueWindow=phase<3||phase>16;
+      if(dialogueWindow&&elapsed>=nextEmcee){say(emcee,emceeLines[emceeLine++%emceeLines.length],3.5,1);nextEmcee=elapsed+8.7;}
+      if(dialogueWindow&&elapsed>=nextLyric){say(mo,'♪ '+lyricLines[lyricLine++%lyricLines.length],3.5,1);nextLyric=elapsed+10.3;}
+      if(dialogueWindow&&elapsed>=nextStream){say(streamer,streamLines[streamLine++%streamLines.length],3.5,1);nextStream=elapsed+11.4;}
+      emcee.group.position.set(emcee.home.x,emcee.baseY,emcee.home.z);emcee.observing=false;emcee.phone.visible=false;
+      emcee.body.rotation.y=Math.atan2(-emcee.home.x,1.5-emcee.home.z)+Math.sin(elapsed*.7)*.04;
+      emcee.armR.shoulder.rotation.set(-1.35,0,-.14);emcee.armR.elbow.rotation.set(-1.08,0,0);
+      emcee.armL.shoulder.rotation.set(-.65-Math.sin(elapsed*1.7)*.45,0,.25+Math.sin(elapsed*.65)*.16);
+      emcee.armL.elbow.rotation.set(-.30,0,-.1);emcee.body.position.y=Math.sin(elapsed*2.1)*.025;
+      emcee.head.rotation.set(.03,Math.sin(elapsed*.65)*.12,0);
+      streamer.observing=false;streamer.phone.visible=false;
+      streamer.body.rotation.y=-.65+Math.sin(elapsed*.45)*.18;
+      streamer.armR.shoulder.rotation.set(-1.12,0,-.15);streamer.armR.elbow.rotation.set(-.67,0,0);
+      streamer.armL.shoulder.rotation.set(-.48-Math.sin(elapsed*1.8)*.18,0,.18);
+      streamer.head.rotation.set(-.06,Math.sin(elapsed*.6)*.10,0);
+      if((streamer.speakingUntil||0)>elapsed)streamer.armL.elbow.rotation.z=-.48;
+      if((mo.speakingUntil||0)>elapsed)mo.armL.shoulder.rotation.x-=.15;
     }
     function cheer(){
       const ctx=sound?.ctx;if(!sound?.enabled||!ctx||ctx.state!=='running')return;
@@ -223,54 +336,43 @@
       const step=Math.min(length,speed*dt);p.pos.x+=dx/(length||1)*step;p.pos.z+=dz/(length||1)*step;return true;
     }
     function reset(){
-      elapsed=0;nextBubble=2.5;bubbleIndex=0;lastCheer=-1;effects.drinkUntil=effects.bribeUntil=effects.showUntil=0;
+      elapsed=0;nextBubble=2.5;bubbleIndex=0;lastCheer=-1;
+      nextEmcee=1;nextLyric=16.5;nextStream=18;emceeLine=0;lyricLine=0;streamLine=0;storyCycle=-1;storyCue=-1;
       while(bubbles.length)bubbles.pop().node.remove();
-      for(const p of people){p.pos.x=p.home.x;p.pos.z=p.home.z;p.routeIndex=0;p.detour=null;p.detourKind=null;p.mode='WATCH';p.angle=Math.PI;p.observing=false;p.group.position.set(p.pos.x,p.baseY,p.pos.z);
+      for(const p of people){p.pos.x=p.home.x;p.pos.z=p.home.z;p.routeIndex=0;p.mode='WATCH';p.angle=Math.PI;p.observing=false;p.group.position.set(p.pos.x,p.baseY,p.pos.z);
+        p.speakingUntil=0;
         if(p.role==='waiter'){stations.waiter.x=p.pos.x;stations.waiter.z=p.pos.z;}}
-    }
-    function distract(kind,duration){
-      if(kind==='drink'){
-        effects.drinkUntil=elapsed+(duration||16);
-        const guards=people.filter(p=>p.role==='security');guards.forEach((p,i)=>bubble(p,i?'这困意是虚构道具的效果……':'我坐着歇会儿，发布会太暖和了。',3.4));
-      }else if(kind==='bribe'){
-        effects.bribeUntil=elapsed+(duration||12);
-        bubble(waiter,'各位，外面的演出需要一点掌声！',3.3);
-        for(const p of people.filter(p=>p.role==='security')){p.routeIndex=0;p.detour=[{x:Math.sign(p.home.x)*4.2,z:-2.7},{x:Math.sign(p.home.x)*3.4,z:.4},{x:-1,z:4.0},{x:-1,z:7.6},{x:2.8,z:9.0}];p.detourKind='OUT';}
-        waiter.routeIndex=0;waiter.detour=[{x:-3.8,z:2.2},{x:-1,z:4.2},{x:-1,z:7.6},{x:2.4,z:9.1}];waiter.detourKind='OUT';
-      }else if(kind==='show'){
-        effects.showUntil=elapsed+(duration||7);lastCheer=Math.floor(elapsed/18);cheer();bubble(people.find(p=>p.look==='performance'),'这段我会！掌声跟上！',3.2);
-      }
-      return true;
+      namedActors.forEach(entry=>{if(entry.node)entry.node.hidden=true;});
     }
     function update(dt,playerPos){
-      if(!group.visible){bubbles.forEach(b=>b.node.hidden=true);return;}
+      if(!group.visible){bubbles.forEach(b=>b.node.hidden=true);namedActors.forEach(entry=>{if(entry.node)entry.node.hidden=true;});return;}
       elapsed+=dt;
-      const cycle=elapsed%18,show=elapsed<effects.showUntil||(cycle>7&&cycle<11.5),phoneBreak=cycle>=11.5&&cycle<13.3;
+      const cycle=elapsed%18,show=cycle>7&&cycle<11.5;
       const cheerCycle=Math.floor(elapsed/18);
       if(show&&lastCheer!==cheerCycle){lastCheer=cheerCycle;cheer();}
       floaters.forEach(f=>{f.mesh.position.y=f.baseY+Math.sin(elapsed*.65+f.phase)*.075;f.mesh.rotation.y+=dt*.035;});
       for(const p of people){
-        const t=elapsed+p.phase;let walking=false;
-        const sleeping=p.role==='security'&&elapsed<effects.drinkUntil;
-        const bribed=(p.role==='security'||p.role==='waiter')&&elapsed<effects.bribeUntil;
-        if(!bribed&&p.detourKind==='OUT'){
-          p.detour=[{x:-1,z:7.4},{x:-1,z:4.0},{x:Math.sign(p.home.x)*3.3,z:-1.7},{...p.home}];p.detourKind='BACK';p.routeIndex=0;
-          if(p.role==='waiter')p.detour=[{x:-1,z:7.4},{x:-1,z:4.1},{...p.home}];
-        }
-        if(p.detour&&!sleeping){walking=follow(p,p.detour,1.8,dt);if(!walking){p.detour=null;p.routeIndex=0;if(p.detourKind==='BACK')p.detourKind=null;}}
-        else if(p.role==='security'&&!sleeping&&!bribed)walking=follow(p,p.route,1.1,dt,true);
-        const isPhone=!sleeping&&!show&&!bribed&&(phoneBreak||((t%19)>15.2&&p.role!=='dancer'));
+        const t=elapsed+p.phase,attentionCycle=t%p.attentionPeriod;let walking=false;
+        const isPhone=p.role!=='dancer'&&attentionCycle>p.attentionPeriod-(p.role==='security'?3.2:2.8);
+        const previousX=p.pos.x,previousZ=p.pos.z;
+        if(p.role==='security')walking=follow(p,p.route,isPhone?.38:1.1,dt,true);
+        // Only part of the audience looks toward a musical accent. Each guard keeps
+        // an independent patrol / phone cycle rather than sharing a global blind spot.
+        const watchShow=p.role!=='security'&&p.role!=='waiter'&&(p.look==='performance'||(show&&(p.id+cheerCycle)%3===0));
         const localCheer=p.look==='performance'&&Math.sin(t*.9)>.25;
-        p.mode=sleeping?'SLEEP':isPhone?'PHONE':show||bribed||localCheer?'CHEER':'WATCH';
-        const target=show||bribed||p.look==='performance'?{x:8.5,z:9.1}:p.look==='checkin'?{x:-9.7,z:8.9}:p.look==='experience'?{x:p.home.x,z:-7.3}:{x:0,z:-4.4};
+        p.mode=isPhone?'PHONE':watchShow&&(show||localCheer)?'CHEER':'WATCH';
+        const target=watchShow?{x:8.5,z:9.1}:p.look==='checkin'?{x:-9.7,z:8.9}:p.look==='experience'?{x:p.home.x,z:-7.3}:{x:0,z:-4.4};
         let targetAngle=Math.atan2(target.x-p.pos.x,target.z-p.pos.z);
-        if(p.role==='security'&&!show&&!bribed)targetAngle=Math.atan2(-p.pos.x,-3.2-p.pos.z)+Math.sin(t*.65)*.44;
+        if(p.role==='security'){
+          const followsRoute=attentionCycle<4.8&&walking;
+          targetAngle=followsRoute?Math.atan2(p.pos.x-previousX,p.pos.z-previousZ):Math.atan2(-p.pos.x,-3.2-p.pos.z)+Math.sin(t*.65)*.44;
+        }
         let diff=Math.atan2(Math.sin(targetAngle-p.angle),Math.cos(targetAngle-p.angle));p.angle+=diff*Math.min(1,dt*5);p.lookAngle=p.angle;
         p.group.position.set(p.pos.x,p.baseY,p.pos.z);p.body.rotation.y=p.angle;p.body.position.set(0,0,0);p.body.rotation.x=0;p.body.rotation.z=0;
         if(p.role==='waiter'){stations.waiter.x=p.pos.x;stations.waiter.z=p.pos.z;}
         p.armL.shoulder.rotation.set(0,0,.06);p.armR.shoulder.rotation.set(0,0,-.06);p.armL.elbow.rotation.set(0,0,0);p.armR.elbow.rotation.set(0,0,0);
-        p.head.rotation.set(sleeping?.5:isPhone?.3:Math.sin(t*.4)*.035,0,0);p.phone.visible=isPhone;
-        for(const eye of p.eyes)eye.scale.y=sleeping?.008:.035;
+        p.head.rotation.set(isPhone?.3:Math.sin(t*.4)*.035,0,0);p.phone.visible=isPhone;
+        for(const eye of p.eyes)eye.scale.y=.035;
         if(p.seated){p.legL.hip.rotation.x=p.legR.hip.rotation.x=-Math.PI/2;p.legL.knee.rotation.x=p.legR.knee.rotation.x=Math.PI/2;}
         else {const swing=walking?Math.sin(t*9)*.52:Math.sin(t*1.1)*.025;p.legL.hip.rotation.x=swing;p.legR.hip.rotation.x=-swing;p.legL.knee.rotation.x=Math.max(0,-swing)*.7;p.legR.knee.rotation.x=Math.max(0,swing)*.7;p.body.position.y=walking?Math.abs(Math.sin(t*9))*.06:0;}
         if(p.mode==='PHONE'){p.armR.shoulder.rotation.x=-.85;p.armR.elbow.rotation.x=-1.1;p.armL.shoulder.rotation.x=-.3;}
@@ -278,8 +380,7 @@
           if(p.id%3===0){p.armL.shoulder.rotation.x=-2.6;p.armR.shoulder.rotation.x=-2.6;p.armL.shoulder.rotation.z=.24;p.armR.shoulder.rotation.z=-.24;p.body.position.y+=Math.max(0,Math.sin(t*5))*.055;}
           else{p.armL.shoulder.rotation.x=-1.05;p.armR.shoulder.rotation.x=-1.05;p.armL.elbow.rotation.z=-.75-Math.sin(t*14)*.17;p.armR.elbow.rotation.z=.75+Math.sin(t*14)*.17;}
         }else if(p.role==='media'){p.armR.shoulder.rotation.x=-.85;p.armL.shoulder.rotation.x=-.5;}
-        if(sleeping){p.body.position.y-=.18;p.body.rotation.x=.13;p.armL.shoulder.rotation.x=-.15;p.armR.shoulder.rotation.x=-.15;}
-        p.observing=p.role!=='dancer'&&!sleeping&&!isPhone&&!show&&!bribed&&!p.detour&&p.pos.z<5.7;
+        p.observing=p.role!=='dancer'&&p.role!=='emcee'&&p.role!=='stage-security'&&!isPhone&&!watchShow&&p.pos.z<5.7;
         if(p.fan){p.fan.position.set(p.pos.x,0,p.pos.z);p.fan.rotation.y=p.lookAngle;p.fan.visible=p.observing;}
         p.shadow.position.set(p.pos.x,.029,p.pos.z);
       }
@@ -292,19 +393,23 @@
         p.legL.hip.rotation.x=wave*.3;p.legR.hip.rotation.x=-wave*.3;p.legL.knee.rotation.x=lift*.3;p.legR.knee.rotation.x=Math.max(0,-Math.sin(t*2))*.3;
         p.head.rotation.set(.02,Math.sin(t*.6)*.16,0);p.phone.visible=false;p.observing=false;
       }
+      updatePerformance();updateNameplates();
       if(elapsed>=nextBubble){
         nextBubble=elapsed+3.7;
-        const candidates=people.filter(p=>p.role!=='dancer'&&p.role!=='security'&&p.mode!=='SLEEP');
+        const candidates=people.filter(p=>!p.hasNameplate&&p.role!=='dancer'&&p.role!=='security'&&p.role!=='stage-security');
         const p=candidates[(bubbleIndex*11+3)%candidates.length];bubble(p,lines[bubbleIndex%lines.length]);bubbleIndex++;
         if(bubbleIndex%2===0)bubble(candidates[(bubbleIndex*7+9)%candidates.length],lines[(bubbleIndex+9)%lines.length],2.6);
       }
       for(let i=bubbles.length-1;i>=0;i--){const b=bubbles[i];b.life-=dt;if(b.life<=0){b.node.remove();bubbles.splice(i,1);continue;}
         if(!camera){b.node.hidden=true;continue;}
-        const pos=new T.Vector3(b.person.pos.x,b.person.seated?2.1:2.65,b.person.pos.z).project(camera);
-        const sx=(pos.x*.5+.5)*window.innerWidth,sy=(-pos.y*.5+.5)*window.innerHeight;
+        const p=b.person,anchorY=p.hasNameplate?p.group.position.y+3.2*p.group.scale.y:(p.seated?2.1:2.65);
+        const pos=new T.Vector3(p.group.position.x,anchorY,p.group.position.z).project(camera);
+        let sx=(pos.x*.5+.5)*window.innerWidth;const sy=(-pos.y*.5+.5)*window.innerHeight;
         const hero=new T.Vector3(0,1.9,-5.8).project(camera),hx=(hero.x*.5+.5)*window.innerWidth,hy=(-hero.y*.5+.5)*window.innerHeight;
         const overProduct=Math.abs(sx-hx)<150&&Math.abs(sy-hy)<85;
-        b.node.hidden=pos.z>1||overProduct||sx<90||sx>window.innerWidth-90||sy<125||sy>window.innerHeight-90;
+        if(b.priority>0&&overProduct)sx=hx+(sx<hx?-172:172);
+        if(b.priority>0)sx=clamp(sx,100,window.innerWidth-100);
+        b.node.hidden=pos.z>1||(!b.priority&&overProduct)||sx<90||sx>window.innerWidth-90||sy<80||sy>window.innerHeight-65;
         b.node.style.left=sx+'px';b.node.style.top=sy+'px';
       }
     }
@@ -317,7 +422,7 @@
       }return null;
     }
     reset();
-    return {group,people,stations,update,reset,witness,distract,alertCount:()=>people.filter(p=>p.observing).length};
+    return {group,people,stations,namedActors,update,reset,witness,alertCount:()=>people.filter(p=>p.observing).length};
   }
   root.LaunchVenue={build};
 })(typeof window!=='undefined'?window:globalThis);

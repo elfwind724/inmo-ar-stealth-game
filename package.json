@@ -1,8 +1,8 @@
 {
   "name": "inmo-ar-stealth-game",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
-  "description": "INMO launch event stealth game with outdoor show, indoor prototype and crowd AI",
+  "description": "INMO launch-event key puzzle and stealth challenge",
   "scripts": {
     "build": "node tools/build.mjs",
     "dev": "node tools/serve.mjs",
