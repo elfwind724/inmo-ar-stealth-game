@@ -9,7 +9,7 @@ html,body{background:#171c22;}
 .mission-footer{font-size:9px;}.mission-footer button{color:#e8c68d;}
 #stolen-progress-badge{background:#4c3824;color:#f7d590;border-color:#b98a50;}
 #launch-event-tag{position:fixed;z-index:17;top:18px;left:50%;transform:translateX(-50%);padding:7px 14px;border:1px solid #b38a554a;border-radius:25px;background:#22221cb5;color:#e5bb7a;font-size:10px;letter-spacing:.12em;pointer-events:none;}
-#launch-kit{position:fixed;right:14px;top:108px;z-index:26;width:220px;border-radius:9px;padding:7px;}
+#launch-kit{position:fixed;right:14px;top:148px;z-index:26;width:220px;border-radius:9px;padding:7px;}
 #kit-toggle{display:flex;gap:12px;justify-content:space-between;align-items:center;width:100%;padding:5px;color:#e4cda1;font-size:11px;}
 #kit-toggle strong{font:10px monospace;color:#c1af8d;}
 #kit-content p{font-size:10px;line-height:1.6;color:#a9a68f;margin:7px 5px;}
@@ -22,10 +22,11 @@ html,body{background:#171c22;}
 #counter-tooltip{border-color:#bd945e;width:180px;}#tt-svg-holder{height:66px;background:#1a2529;border-color:#586363;}#tt-spec{display:block;font-size:9px;white-space:normal;line-height:1.5;}#tt-name,#tt-price,#tt-take-btn{color:#e9c78d;}
 #btn-quick-steal{bottom:114px;min-height:40px;padding:10px 13px;font-size:11px;border-color:#bc985d;background:#332d23ee;color:#f1cc94;}
 #modal-catalog a{color:#d7b381;}#catalog-grid{grid-template-columns:1fr;}#catalog-grid>div>div:first-child{background:#172329;}
+.launch-concept-card{padding:18px;background:#172329;border:1px solid #93744e70;border-radius:10px;}.launch-concept-card>div{height:130px;}.launch-concept-card svg{width:100%;height:100%;}.launch-concept-card h3{color:#eccb94;font-size:16px;margin:12px 0;}.launch-concept-card p{font-size:12px;line-height:1.8;color:#adbbb9;margin-bottom:14px;}.launch-concept-card button{padding:10px 16px;}
 #clerk-bubble{display:none!important;}
 @media(max-width:700px){
  #launch-event-tag{top:91px;font-size:8px;padding:5px 8px;}
- #launch-kit{right:10px;top:122px;width:170px;}#kit-toggle{font-size:10px;gap:6px;}#kit-content small{font-size:8px;}
+ #launch-kit{right:10px;top:140px;width:170px;}#kit-toggle{font-size:10px;gap:6px;}#kit-content small{font-size:8px;}
  .mission-panel.collapsed{width:170px;}.mission-panel{width:215px;}
  #launch-bubbles>span,.launch-bubble{max-width:135px;font-size:9px;padding:5px 7px;}
  #btn-quick-steal{bottom:118px;right:12px;}
