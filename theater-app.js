@@ -18,9 +18,10 @@
     const show=TheaterShow.create(),state=show.state;
     const viewer={x:0,z:3.2,yaw:0,pitch:.055,mode:'first',walking:0,heading:Math.PI};
     let menu=false,roaming=false,lastStamp=0,poseTime=0,lastCue='',currentStageTitle='',reaction='',reactionUntil=0,roamStarted=false;
-    let encoreActive=false,encoreElapsed=0,nextEncoreCheer=0,encoreCheerIndex=0;
-    const encoreCue={id:'encore-dance',actor:'xiaoying',action:'dance',duration:16,chapter:'返场 · 四人齐舞'};
-    const encoreCheers=['欢迎返场！再来一支！','小影领舞，掌声跟上！','云飞哥，这次可以不朗诵！','爵爷稳住，这次别退场！','小仓鼠：不跳绳，跳舞！','四位太会了！今晚的快乐不散场！'];
+    let encoreActive=false,encoreElapsed=0,nextEncoreCheer=0,encoreCheerIndex=0,lastEncoreSection='';
+    const encoreCue={id:'encore-dance',actor:'xiaoying',action:'dance',duration:64,chapter:'返场 · BREAKING'};
+    const performerNames={xiaoying:'inmo小影',yunfei:'周云飞',hamster:'小仓鼠',weijue:'韦爵爷'};
+    const encoreCheers=['欢迎返场！再来一轮！','这脚步也太快了！掌声跟上！','云飞哥，今天靠舞技圈粉了！','爵爷稳住，这次是主动下地！','小仓鼠：地板才是我的主场！','定住这一拍！全场一起欢呼！'];
     const keys=new Set(),movePointers=new Map();let lookPointer=null,lookX=0,lookY=0;
     const pointerAllowed=()=>!menu&&!document.hidden&&state.phase!=='READY';
     const paused=()=>menu||document.hidden;
@@ -97,7 +98,7 @@
     function setView(){const modes=['first','third','overhead'];viewer.mode=modes[(modes.indexOf(viewer.mode)+1)%3];clearInput();viewUI();}
     function start(replay=false){
       cancelVoice();show.restart();menu=false;roaming=false;roamStarted=false;lastCue='';currentStageTitle='';poseTime=0;reaction='';reactionUntil=0;lastReactionAt=-100;
-      encoreActive=false;encoreElapsed=0;nextEncoreCheer=0;encoreCheerIndex=0;document.body.classList.remove('encore');
+      encoreActive=false;encoreElapsed=0;nextEncoreCheer=0;encoreCheerIndex=0;lastEncoreSection='';document.body.classList.remove('encore');delete document.body.dataset.danceMove;
       for(const a of Object.values(venue.actors)){a.group.visible=false;a.group.position.set(-10,.75,-9);a.group.rotation.set(0,0,0);}
       const host=venue.actors.xiaoying;host.group.visible=true;host.group.position.set(0,.75,-8.3);
       performance.reset();
@@ -114,7 +115,7 @@
     $('ending-exit').addEventListener('click',()=>location.reload());
     function beginEncore(){
       if(encoreActive)return;
-      encoreActive=true;encoreElapsed=0;nextEncoreCheer=0;encoreCheerIndex=0;roamStarted=true;
+      encoreActive=true;encoreElapsed=0;nextEncoreCheer=0;encoreCheerIndex=0;lastEncoreSection='';roamStarted=true;
       document.body.dataset.cue='encore-dance';
       ['yunfei','xiaoying','hamster','weijue'].forEach((id,index)=>{
         const actor=venue.actors[id];
@@ -122,8 +123,23 @@
       });
       cancelVoice();document.body.classList.add('encore');$('ending').hidden=false;$('subtitles').hidden=true;$('reaction-controls').hidden=false;
       $('chapter-label').textContent=encoreCue.chapter;$('cue-counter').textContent='循环演出';
-      venue.setStageTitle?.('全员返场','ENCORE · 掌声不要停');
+      syncEncoreInfo();
     }
+    function syncEncoreInfo(){
+      const info=TheaterPerformance.encoreInfo?.(encoreElapsed)||{label:'Breaking 齐舞',section:0,duration:64};
+      const lead=info.performer?(performerNames[info.performer]||info.performer):'四人齐舞';
+      const moveText=info.performer?(info.moveLabel||info.label):info.label;
+      const leadText=lead+' · '+Math.floor((encoreElapsed%(info.duration||64))+1)+' / '+(info.duration||64)+'秒';
+      if($('encore-move').textContent!==moveText)$('encore-move').textContent=moveText;if($('encore-lead').textContent!==leadText)$('encore-lead').textContent=leadText;
+      $('cue-counter').textContent=lead;document.body.dataset.danceMove=info.label;
+      const sectionKey=info.section+' / '+lead;
+      if(sectionKey!==lastEncoreSection){lastEncoreSection=sectionKey;venue.setStageTitle?.(info.performer?lead+' SOLO':'BREAKING 返场',info.performer?'脚步 · 支撑 · 定格':info.label);}
+      return info;
+    }
+    $('ending-next').addEventListener('click',()=>{
+      if(!encoreActive||paused())return;
+      encoreElapsed=(Math.floor(encoreElapsed/8)+1)*8;nextEncoreCheer=encoreElapsed;syncEncoreInfo();canvas.focus();
+    });
     $('jump-encore').addEventListener('click',()=>{
       if(state.phase==='READY')start();
       setMenu(false);
@@ -204,6 +220,7 @@
         if(state.phase==='ENDED'&&!encoreActive)beginEncore();
         if(encoreActive){
           encoreElapsed+=dt;
+          syncEncoreInfo();
           if(encoreElapsed>=nextEncoreCheer){react('cheer');$('reaction-toast').textContent=encoreCheers[encoreCheerIndex++%encoreCheers.length];nextEncoreCheer=encoreElapsed+5.5;}
         }
         if(state.phase==='PLAYING'||encoreActive)poseActors(dt);

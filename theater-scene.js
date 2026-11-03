@@ -208,11 +208,15 @@
       }
     }
     batchStatic();batchStatic(chairRoot);
+    const breakingFloor=new T.Group();breakingFloor.name='encore-floor-ring';breakingFloor.visible=false;movingRoot.add(breakingFloor);
+    const ringMaterial=new T.MeshBasicMaterial({color:0xe6b867,transparent:true,opacity:.35,depthWrite:false,toneMapped:false,side:T.DoubleSide});mats.push(ringMaterial);
+    for(const radius of [2.28,2.40]){const ring=new T.Mesh(new T.RingGeometry(radius-.012,radius,96),ringMaterial);ring.rotation.x=-Math.PI/2;ring.position.set(0,stageY+.013,-8.05);breakingFloor.add(ring);}
+    for(let i=0;i<12;i++){const angle=i*Math.PI/6;const tick=new T.Mesh(new T.BoxGeometry(.025,.008,.11),ringMaterial);tick.position.set(Math.sin(angle)*2.34,stageY+.015,-8.05+Math.cos(angle)*2.34);tick.rotation.y=angle;breakingFloor.add(tick);}
     let lastCue='',lastTime=0;
     const baseLightColors=stageLights.map(light=>light.color.clone());
     const encoreWarm=new T.Color(0xffc26d),encoreRose=new T.Color(0xe29bd0);
     function update(dt,frame={}){
-      const time=Number(frame.time)||0,reaction=frame.reaction||'',cue=frame.cue||{};lastTime=time;
+      const time=Number(frame.time)||0,reaction=frame.reaction||'',cue=frame.cue||{};lastTime=time;breakingFloor.visible=!!frame.encore;
       if(frame.blackout!==undefined)setBlackout(frame.blackout);
       for(let i=0;i<stageLights.length;i++){
         const light=stageLights[i];light.color.copy(baseLightColors[i]);light.intensity=baseIntensities[i]*(1-blackout);

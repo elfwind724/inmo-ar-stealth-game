@@ -9,6 +9,23 @@
   const angles=(x=0,y=0,z=0)=>[x,y,z];
   const joints=['head','armL','armR','forearmL','forearmR','legL','legR','shinL','shinR'];
 
+
+  const ENCORE_DURATION=64,encoreOrder=['yunfei','xiaoying','hamster','weijue'];
+  const performerNames={yunfei:'周云飞',xiaoying:'inmo小影',hamster:'小仓鼠',weijue:'韦爵爷'};
+  function encoreInfo(seconds){
+    const cycle=((Number(seconds)||0)%ENCORE_DURATION+ENCORE_DURATION)%ENCORE_DURATION,section=Math.floor(cycle/8);
+    let label='',moveLabel='',performer=null;
+    if(section===0){label='Toprock · 交叉摇步';moveLabel=cycle<4?'交叉步 / 撤步':'侧点步 / 踢步换重心';}
+    else if(section===1){label='Locking · 机械卡点';moveLabel=cycle<12?'肩胸 Hit / 手臂锁点':'手臂波浪 / 队形展开';}
+    else if(section<=5){
+      performer=encoreOrder[section-2];const t=cycle-section*8;
+      moveLabel=t<1.1?'Toprock · 入圈':t<1.9?'Go-down · 支撑下地':t<4.15?'Six-step · 六步脚步':t<5.25?'CC / Sweep · 穿腿扫腿':t<6.2?'Freeze · 侧撑定格':t<7.25?'Get-up · 支撑起身':'归队 / 接力';
+      label=performerNames[performer]+' SOLO · '+moveLabel;
+    }else if(section===6){label='齐舞 · 地板接力';moveLabel=cycle<49.6?'交叉下地':cycle<52.5?'六步脚步 / 交替穿腿':cycle<54.0?'低位扫腿 / 集体 Freeze':'起身回拍';}
+    else{label='Finale · 四人齐锁';moveLabel=cycle<59?'踢步 / 胸肩锁点':cycle<62?'手臂波浪 / 双重定格':'收势 / 循环返场';}
+    return {duration:ENCORE_DURATION,cycle,section,label,moveLabel,performer,performerName:performer?performerNames[performer]:null,solo:performer};
+  }
+
   function create({venue}){
     const actors=venue.actors,stageY=venue.stageY??.75,origins=new Map();
     let cueId='';
@@ -93,104 +110,137 @@
     }
 
     function updateEncore(dt,frame){
-      const time=Math.max(0,Number(frame.localTime)||0),cycle=time%16;
-      // Keep the curtain-call order: nobody crosses through a neighbour while
-      // the two centre performers exchange their earlier speaking positions.
-      const order=['yunfei','xiaoying','hamster','weijue'];
+      const time=Math.max(0,Number(frame.localTime)||0),info=encoreInfo(time),cycle=info.cycle,tau=Math.PI*2;
+      const order=encoreOrder;
       if(cueId!=='encore-dance'){
         cueId='encore-dance';encoreOrigins.clear();
-        for(const id of order){
-          const a=actors[id],r=a.group.rotation,p={};
-          for(const name of joints){const j=a[name]?.rotation;p[name]=j?[j.x,j.y,j.z]:[0,0,0];}
-          p.torso=a.body?.rotation.x||0;p.torsoSide=a.body?.rotation.z||0;
-          encoreOrigins.set(id,{x:a.group.position.x,y:a.group.position.y,z:a.group.position.z,rx:r.x,ry:r.y,rz:r.z,pose:p});
-        }
+        for(const id of order){const a=actors[id],r=a.group.rotation,p={};for(const name of joints){const j=a[name]?.rotation;p[name]=j?[j.x,j.y,j.z]:[0,0,0];}p.torso=a.body?.rotation.x||0;p.torsoSide=a.body?.rotation.z||0;encoreOrigins.set(id,{x:a.group.position.x,y:a.group.position.y,z:a.group.position.z,rx:r.x,ry:r.y,rz:r.z,pose:p});}
       }
-      const intro=progress(time,0,1.2),tau=Math.PI*2;
-      // 120 BPM, four eight-count phrases. Every phrase modifier has zero
-      // position and velocity at its endpoints; the base groove repeats too.
-      const beat=tau*cycle/.5,groove=tau*cycle/2,slow=tau*cycle/4;
-      const section=Math.min(3,Math.floor(cycle/4)),within=cycle-section*4;
-      const envelope=Math.sin(Math.PI*within/4)**2;
+      const intro=progress(time,0,1.2),beat=tau*cycle/.5,groove=tau*cycle/2,slow=tau*cycle/4;
+      const sway=Math.sin(groove),accent=Math.cos(groove),pulseBeat=(1-Math.cos(beat))*.5;
+      const soloIndex=cycle>=16&&cycle<48?Math.floor((cycle-16)/8):-1,soloTime=soloIndex>=0?(cycle-16)%8:0;
+      const back=cycle<16?progress(cycle,14,16):cycle<48?1:1-progress(cycle,48,49.1);
+      const six=[
+        {lx:-.14,lz:.91,rx:.46,rz:.34,lh:-1.03,rh:-.34,lk:1.58,rk:.72},
+        {lx:-.47,lz:.78,rx:.42,rz:.62,lh:-.82,rh:-1.20,lk:1.26,rk:1.72},
+        {lx:-.49,lz:.45,rx:.12,rz:.95,lh:-.34,rh:-1.10,lk:.76,rk:1.62},
+        {lx:-.22,lz:.31,rx:.48,rz:.78,lh:-1.18,rh:-.72,lk:1.80,rk:1.18},
+        {lx:.10,lz:.91,rx:.47,rz:.36,lh:-1.16,rh:-.34,lk:1.73,rk:.73},
+        {lx:-.38,lz:.69,rx:.24,rz:.31,lh:-.77,rh:-1.16,lk:1.19,rk:1.80}
+      ];
       for(let i=0;i<order.length;i++){
         const id=order[i],a=actors[id];if(!a)continue;
-        const g=a.group,origin=encoreOrigins.get(id),style=[1.0,1.08,.87,1.02][i];
-        const direction=i%2?-1:1,sway=Math.sin(groove),accent=Math.sin(groove+Math.PI/2);
-        const pulseBeat=(1-Math.cos(beat))*.5;
-        const p={
-          head:angles(-.035+.035*Math.sin(slow),-.065*sway,-.065*sway),
-          armL:angles(-.43-.10*accent,.05,-.27-.075*sway),
-          armR:angles(-.43+.10*accent,-.05,.27-.075*sway),
-          forearmL:angles(-1.02+.10*Math.sin(groove+.5),.08*Math.sin(groove),-.10),
-          forearmR:angles(-1.02+.10*Math.sin(groove+Math.PI+.5),-.08*Math.sin(groove),.10),
-          legL:angles(-.06-.04*accent,0,.09+.065*sway),
-          legR:angles(-.06+.04*accent,0,-.09+.065*sway),
-          shinL:angles(.14+.11*(1-accent)*.5),shinR:angles(.14+.11*(1+accent)*.5),
-          torso:.028*Math.sin(groove-Math.PI/3),torsoSide:-.105*sway*style
-        };
-        let x=-3.3+i*2.2+.135*sway*style,z=-7.8+.045*Math.sin(slow),yaw=.115*Math.sin(groove),roll=.026*sway;
-        let y=stageY+.02*pulseBeat;
-        if(section===0){
-          // Hip figure-eights, a fan of the hands beside the face, then an
-          // open-palmed invitation. The torso counter-rotates over the hips.
-          p.torsoSide-=envelope*.065*Math.sin(groove+.45)*style;
-          p.torso+=envelope*.055*Math.sin(slow);
-          p.armL[0]-=envelope*(.50+.20*Math.sin(groove));
-          p.armR[0]-=envelope*(.50-.20*Math.sin(groove));
-          p.armL[2]-=envelope*.24;p.armR[2]+=envelope*.24;
-          p.forearmL[1]+=envelope*.30*Math.sin(groove+.6);
-          p.forearmR[1]-=envelope*.30*Math.sin(groove+.6);
-          p.forearmL[2]-=envelope*.21*Math.cos(groove);p.forearmR[2]-=envelope*.21*Math.cos(groove);
-          yaw+=envelope*.17*Math.sin(slow);
-        }else if(section===1){
-          // Compact crossing steps: knees soften on the weight shift while
-          // the opposite shoulder and hand draw an S-shaped flourish.
-          const step=Math.sin(groove),cross=Math.sin(slow);
-          x+=envelope*.12*step;z+=envelope*.10*Math.sin(groove-Math.PI/2);
-          p.legL[2]+=envelope*.15*cross;p.legR[2]+=envelope*.15*cross;
-          p.legL[0]-=envelope*.16*Math.max(0,step);p.legR[0]-=envelope*.16*Math.max(0,-step);
-          p.shinL[0]+=envelope*.20*Math.max(0,step);p.shinR[0]+=envelope*.20*Math.max(0,-step);
-          p.armL[0]-=envelope*(.35+.30*Math.sin(slow));p.armR[0]-=envelope*(.35-.30*Math.sin(slow));
-          p.forearmL[0]-=envelope*.25;p.forearmR[0]-=envelope*.25;
-          p.head[1]+=envelope*.17*Math.sin(slow);p.torsoSide+=envelope*.045*Math.sin(groove+.75);
-        }else if(section===2){
-          // Alternating overhead arcs with elbows and wrists following a
-          // delayed wave, plus a small body roll rather than a rigid lean.
-          const wave=Math.sin(slow),shoulder=Math.sin(groove-.25);
-          p.armL[0]-=envelope*(1.35+.22*wave);p.armR[0]-=envelope*(1.35-.22*wave);
-          p.armL[2]-=envelope*.22;p.armR[2]+=envelope*.22;
-          p.forearmL[0]+=envelope*.30*Math.sin(slow-.55);p.forearmR[0]-=envelope*.30*Math.sin(slow-.55);
-          p.forearmL[2]+=envelope*.22*Math.sin(groove-.6);p.forearmR[2]+=envelope*.22*Math.sin(groove-.6);
-          p.head[0]+=envelope*.065*Math.sin(groove+.65);p.torso+=envelope*.075*shoulder;
-          yaw+=envelope*.24*wave;
+        const g=a.group,origin=encoreOrigins.get(id),dir=i%2?-1:1,style=[1.0,1.06,.88,1.04][i];
+        let p={head:angles(-.035+.025*Math.sin(slow),.06*sway,-.035*sway),armL:angles(-.42-.12*accent,.05,-.22),armR:angles(-.42+.12*accent,-.05,.22),forearmL:angles(-.80+.1*sway,0,-.10),forearmR:angles(-.80-.1*sway,0,.10),legL:angles(-.06-.035*accent,0,.07),legR:angles(-.06+.035*accent,0,-.07),shinL:angles(.14),shinR:angles(.14),torso:.02*Math.sin(groove-.4),torsoSide:-.055*sway*style};
+        const baseline={};for(const name of joints)baseline[name]=p[name].slice();baseline.torso=p.torso;baseline.torsoSide=p.torsoSide;
+        let x=-3.3+i*2.2+.10*sway*style,y=stageY+.02*pulseBeat,z=-8.2-2.0*back,rx=0,yaw=.08*sway,roll=.018*sway;
+        let floorWeight=0,floorClock=0,mode='standing',sweepWeight=0,freezeWeight=0;
+        const dancer=soloIndex===i,soloSlot=soloIndex>=0;
+        if(cycle<8){
+          // The planted side carries the weight; the opposite leg crosses,
+          // opens and recoils. Arms counter-swing rather than copying the hips.
+          const phrase=Math.sin(Math.PI*(cycle%4)/4)**2,kick=Math.max(0,Math.sin(groove));
+          p.legL=angles(-.14-.40*kick*phrase,-.10*phrase,.08+.21*Math.sin(slow)*phrase);
+          p.legR=angles(-.14-.40*Math.max(0,-sway)*phrase,.10*phrase,-.08+.21*Math.sin(slow)*phrase);
+          p.shinL=angles(.17+.48*Math.max(0,-sway)*phrase);p.shinR=angles(.17+.48*kick*phrase);
+          p.armL=angles(-.28-.56*Math.max(0,-sway)*phrase,.10,-.18-.25*phrase);p.armR=angles(-.28-.56*kick*phrase,-.10,.18+.25*phrase);
+          p.forearmL=angles(-.66-.33*kick*phrase);p.forearmR=angles(-.66-.33*Math.max(0,-sway)*phrase);
+          p.torsoSide=-.10*sway*phrase;p.torso=-.05*accent*phrase;
+          x+=.16*Math.sin(slow)*phrase;z+=.13*Math.sin(groove)*phrase;y+=.035*phrase*pulseBeat;
+          yaw+=.19*Math.sin(slow)*phrase;
+        }else if(cycle<16){
+          const t=cycle-8,window=Math.sin(Math.PI*(t%4)/4)**2,hit=Math.max(0,Math.cos(beat))**8;
+          const wave=Math.sin(slow+i*.20);
+          p.armL=angles(-.50-.95*window,-.10,-.30-.48*window);p.armR=angles(-.50-.95*window,.10,.30+.48*window);
+          p.forearmL=angles(-.85-.45*window,.30*window*wave,-.26*window);p.forearmR=angles(-.85-.45*window,-.30*window*wave,.26*window);
+          p.torso=-.11*window*hit;p.torsoSide=.06*wave*window;p.head=angles(-.03-.055*hit*window,.08*wave,-.04*wave);
+          p.legL=angles(-.12-.18*Math.max(0,sway)*window,0,.08+.12*wave*window);p.legR=angles(-.12-.18*Math.max(0,-sway)*window,0,-.08+.12*wave*window);
+          p.shinL=angles(.20+.18*Math.max(0,-sway)*window);p.shinR=angles(.20+.18*Math.max(0,sway)*window);
+          x+=.08*wave*window;y+=.025*hit*window;yaw+=.12*wave*window;
+        }else if(soloSlot){
+          if(dancer){
+            const travelX=progress(soloTime,.42,1.08)*(1-progress(soloTime,6.85,7.48));
+            const travelZ=progress(soloTime,.05,.46)*(1-progress(soloTime,7.45,8.0));
+            // Use a front lane before moving sideways: diagonal returns used
+            // to skim a neighbour's knees in the back row.
+            x=mix(-3.3+i*2.2,0,travelX)+.055*sway*travelX;z=mix(-10.2,-8.1,travelZ);
+            floorWeight=pulse(soloTime,1.1,1.9,6.15,7.25);floorClock=Math.max(0,soloTime-1.9);
+            mode=soloTime<4.15?'sixstep':soloTime<5.25?'cc':soloTime<6.20?'freeze':'getup';
+            sweepWeight=pulse(soloTime,4.10,4.35,4.95,5.3);freezeWeight=pulse(soloTime,5.2,5.42,6.05,6.25);
+            if(soloTime<1.1||soloTime>7.25){const flourish=pulse(soloTime,.12,.35,.72,1.05);p.armL=angles(-.4-1.0*flourish,0,-.18-.55*flourish);p.forearmL=angles(-.8+.3*flourish);p.head[1]=.2*flourish*dir;}
+          }else{
+            // The cypher stays occupied: onlookers give space, clap, point at
+            // the active dancer and answer each freeze with an overhead cheer.
+            const cheer=pulse(soloTime,5.25,5.55,6.4,6.85),clap=.5+.5*Math.sin(beat*.5+i*.45);
+            p.armL=angles(-.85-1.05*cheer,0,-.18-.18*clap);p.armR=angles(-.85-1.05*cheer,0,.18+.18*clap);
+            p.forearmL=angles(-1.1+.6*cheer,0,-.18*clap);p.forearmR=angles(-1.1+.6*cheer,0,.18*clap);
+            p.head=angles(-.02,-.15*Math.sign(x),-.025*sway);p.torsoSide=-.035*sway;
+          }
+        }else if(cycle<56){
+          const t=cycle-48,group=pulse(t,.65,1.55,5.95,7.15);
+          floorWeight=group;floorClock=t-.9+i*.10;
+          sweepWeight=pulse(t,3.75,4.05,4.75,5.05);freezeWeight=pulse(t,4.90,5.15,5.75,6.0);
+          mode=t<3.75?'sixstep':t<5.0?'cc':t<6.0?'freeze':'getup';
         }else{
-          // A full shared turn lands on the beat, followed by a playful
-          // shoulder pose. 2π and 0 are the same final orientation, and the
-          // turn's easing has zero velocity at that reset point.
-          const turn=progress(within,.20,2.25);
-          yaw+=within<2.25?tau*turn:0;
-          const flourish=pulse(within,.20,.65,1.65,2.35),pose=pulse(within,2.25,2.60,3.30,3.85);
-          p.armL[0]-=flourish*.85+pose*.75;p.armR[0]-=flourish*.85;
-          p.armL[2]-=flourish*.50;p.armR[2]+=flourish*.50;
-          p.forearmL[0]-=pose*.50;p.forearmR[0]-=pose*.42;
-          p.head[2]-=pose*.10*direction;p.head[1]+=pose*.18*direction;
-          p.torsoSide-=pose*.06*direction;
-          p.legL[0]-=pose*.10;p.shinL[0]+=pose*.16;
+          const t=cycle-56,phrase=Math.sin(Math.PI*(t%4)/4)**2,hit=Math.max(0,Math.cos(beat))**8;
+          const lock=pulse(t,.35,.7,2.1,2.5),wave=pulse(t,2.6,3.2,5.1,5.8),pose=pulse(t,5.45,5.8,6.8,7.5);
+          p.armL=angles(-.4-.85*lock-1.20*wave-.7*pose,.16*wave,-.22-.45*wave-.30*pose);
+          p.armR=angles(-.4-.85*lock-1.20*wave,-.16*wave,.22+.45*wave+.10*pose);
+          p.forearmL=angles(-.8-.5*lock+.35*wave*Math.sin(slow),.25*wave,-.2*lock);p.forearmR=angles(-.8-.5*lock-.35*wave*Math.sin(slow),-.25*wave,.2*lock);
+          p.legL=angles(-.06-.24*Math.max(0,sway)*phrase,0,.07+.1*pose);p.legR=angles(-.06-.24*Math.max(0,-sway)*phrase,0,-.07-.1*pose);
+          p.shinL=angles(.14+.26*Math.max(0,-sway)*phrase);p.shinR=angles(.14+.26*Math.max(0,sway)*phrase);
+          p.torso=-.07*hit*lock;p.torsoSide=-.055*sway-.05*pose*dir;p.head[2]-=.075*pose*dir;
+          yaw+=.12*Math.sin(slow)*wave;
         }
-        // A little individual charm, still on the same count and formation.
-        p.head[2]+=.018*direction*Math.sin(slow);
-        if(id==='weijue')p.torsoSide*=1.10;
-        if(id==='hamster'){p.shinL[0]+=.035*pulseBeat;p.shinR[0]+=.035*pulseBeat;}
-        if(id==='xiaoying'){p.forearmL[2]-=.055*Math.sin(groove);p.forearmR[2]+=.055*Math.sin(groove);}
+        let breaking=null;
+        if(floorWeight>.00001){
+          const phase=((floorClock%2.4)+2.4)%2.4/.4,index=Math.floor(phase),fraction=phase-index;
+          const from=six[index%6],to=six[(index+1)%6],step=smooth(fraction),sample={};for(const key of Object.keys(from))sample[key]=mix(from[key],to[key],step);
+          const swing=Math.sin(Math.PI*fraction)**2,swingLeft=index%2===0;
+          const fp={head:angles(-.16,.08*Math.sin(floorClock*2.5),0),armL:angles(-.95,.05,-.10),armR:angles(-.95,-.05,.10),forearmL:angles(-.18),forearmR:angles(-.18),legL:angles(sample.lh,.08,-.15),legR:angles(sample.rh,-.08,.15),shinL:angles(sample.lk),shinR:angles(sample.rk),torso:0,torsoSide:0};
+          let handL={x:-.28,y:0,z:1.2,ground:true,weight:floorWeight},handR={x:.28,y:0,z:1.2,ground:true,weight:floorWeight};
+          let footL={x:sample.lx,y:0,z:sample.lz,ground:true,lift:swingLeft?.10*swing:0,weight:floorWeight},footR={x:sample.rx,y:0,z:sample.rz,ground:true,lift:swingLeft?0:.10*swing,weight:floorWeight};
+          if(sweepWeight>0){
+            const turn=(Math.max(0,soloSlot?soloTime-4.15:cycle-51.75)/1.10)*tau;
+            const sweepSide=(i%2===0?1:-1),reach=.52;
+            const ccL=angles(-1.18,.12,.52*sweepSide),ccR=angles(-.40,-.12,-.45*sweepSide);
+            fp.legL=ccL.map((v,k)=>mix(fp.legL[k],v,sweepWeight));fp.legR=ccR.map((v,k)=>mix(fp.legR[k],v,sweepWeight));
+            fp.shinL[0]=mix(fp.shinL[0],.22,sweepWeight);fp.shinR[0]=mix(fp.shinR[0],1.68,sweepWeight);
+            footL={x:mix(sample.lx,Math.cos(turn)*reach,sweepWeight),y:.04,z:mix(sample.lz,.58+Math.sin(turn)*.24,sweepWeight),ground:true,lift:.12*sweepWeight,weight:floorWeight};
+            footR={x:mix(sample.rx,.28,sweepWeight),y:0,z:mix(sample.rz,.35,sweepWeight),ground:true,lift:0,weight:floorWeight};
+            handL.weight=floorWeight*(1-.25*sweepWeight);handR.weight=floorWeight;
+            fp.forearmL[2]=-.22*sweepWeight;fp.head[1]=.15*Math.sin(turn)*sweepWeight;
+          }
+          if(freezeWeight>0){
+            fp.legL=fp.legL.map((v,k)=>mix(v,[-1.10,.08,.62*dir][k],freezeWeight));fp.legR=fp.legR.map((v,k)=>mix(v,[-.63,-.08,-.20*dir][k],freezeWeight));
+            fp.shinL[0]=mix(fp.shinL[0],.35,freezeWeight);fp.shinR[0]=mix(fp.shinR[0],1.82,freezeWeight);
+            fp.head[1]=mix(fp.head[1],-.18*dir,freezeWeight);fp.head[2]=mix(0,-.06*dir,freezeWeight);
+            handL.weight=floorWeight;handR.weight=floorWeight;
+            footL.x=mix(footL.x,-.42,freezeWeight);footL.z=mix(footL.z,.65,freezeWeight);footR.x=mix(footR.x,.25,freezeWeight);footR.z=mix(footR.z,.40,freezeWeight);
+            footL.lift=mix(footL.lift||0,.24,freezeWeight);footR.lift=mix(footR.lift||0,.18,freezeWeight);
+            footL.weight=floorWeight;footR.weight=floorWeight;
+          }
+          for(const name of joints)p[name]=p[name].map((v,k)=>mix(v,fp[name][k],floorWeight));
+          p.torso=mix(p.torso,0,floorWeight);p.torsoSide=mix(p.torsoSide,.035*Math.sin(floorClock*3)*(1-freezeWeight),floorWeight);
+          rx=1.10*floorWeight;roll=mix(roll,.18*dir,freezeWeight*floorWeight);y=stageY+.035*floorWeight;
+          yaw+=.10*Math.sin(floorClock*2.5)*floorWeight;
+          if(freezeWeight>0){yaw=mix(yaw,.12*dir,freezeWeight*floorWeight);x=mix(x,dancer?0:-3.3+i*2.2,freezeWeight*floorWeight);z=mix(z,dancer?-8.1:-8.2,freezeWeight*floorWeight);}
+          breaking={weight:floorWeight,floorWeight,support:freezeWeight>.45?'freeze':'hands',hands:{L:handL,R:handR},feet:{L:footL,R:footR},moveLabel:info.moveLabel,solo:dancer?id:null,rootPitch:rx};
+        }
+        // Shared neutral at every eight-second boundary makes cuts to another
+        // dance phrase continuous, including when the user skips to that phrase.
+        const boundary=pulse(cycle%8,0,.30,7.70,8.0);
+        for(const name of joints)p[name]=p[name].map((value,k)=>mix(baseline[name][k],value,boundary));
+        p.torso=mix(baseline.torso,p.torso,boundary);p.torsoSide=mix(baseline.torsoSide,p.torsoSide,boundary);
         for(const name of joints)p[name]=p[name].map((value,k)=>mix(origin.pose[name][k],value,intro));
         p.torso=mix(origin.pose.torso,p.torso,intro);p.torsoSide=mix(origin.pose.torsoSide,p.torsoSide,intro);
-        g.visible=true;g.position.set(mix(origin.x,x,intro),mix(origin.y,y,intro),mix(origin.z,z,intro));
-        g.rotation.set(mix(origin.rx,0,intro),mix(origin.ry,yaw,intro),mix(origin.rz,roll,intro));
-        setPose(a,p,1);
-        if(a.mouth)a.mouth.scale.y=1.1+.1*pulseBeat;
+        g.visible=true;g.position.set(mix(origin.x,x,intro),mix(origin.y,y,intro),mix(origin.z,z,intro));g.rotation.set(mix(origin.rx,rx,intro),mix(origin.ry,yaw,intro),mix(origin.rz,roll,intro));
+        setPose(a,p,1);if(a.mouth)a.mouth.scale.y=1.1+.1*pulseBeat;
         for(const prop of [a.microphone,a.tearDrops,a.sweatDrop,a.rope])if(prop)prop.visible=false;
-        guardGround(a);
-        a.performance={action:'dance',walking:false,speed:0,grounded:true,beat:(cycle%.5)/.5,loopPhase:cycle/16};
+        // Actual imported skins have their own exact vertex ground correction;
+        // the taller fallback should not lift those short-armed GLBs out of reach.
+        if(!a.modelAsset)guardGround(a);
+        a.performance={action:'breaking',walking:false,speed:0,grounded:true,beat:(cycle%.5)/.5,loopPhase:cycle/64,moveLabel:info.moveLabel,solo:dancer?id:null,breaking};
       }
     }
 
@@ -378,6 +428,6 @@
     reset();
     return {update,reset};
   }
-  const api={create};root.TheaterPerformance=api;
+  const api={create,encoreInfo,encoreDuration:ENCORE_DURATION};root.TheaterPerformance=api;
   if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

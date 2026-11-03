@@ -98,9 +98,21 @@
       // The original arm rest is a T pose. Authored shoulder deltas layer over native idle/walk.
       const basisL=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,0,1),-Math.PI/2),basisR=new T.Quaternion().setFromAxisAngle(new T.Vector3(0,0,1),Math.PI/2);
       const native={};for(const [name,pose] of Object.entries(rest))native[name]={position:pose.position.clone(),quaternion:pose.quaternion.clone(),scale:pose.scale.clone()};
-      const contacts=[];
-      if(!seated)model.traverse(mesh=>{if(!mesh.isSkinnedMesh)return;const p=mesh.geometry.getAttribute('position'),weights=mesh.geometry.getAttribute('skinWeight'),joints=mesh.geometry.getAttribute('skinIndex'),seen=new Set();for(let i=0;i<p.count;i++){const key=[p.getX(i),p.getY(i),p.getZ(i),weights.getX(i),weights.getY(i),weights.getZ(i),weights.getW(i),joints.getX(i),joints.getY(i),joints.getZ(i),joints.getW(i)].map(n=>Math.round(n*1e6)).join('/');if(!seen.has(key)){seen.add(key);contacts.push({mesh,index:i});}}});
-      const record={actor,id,model,visual,bones,rest,native,mixer,actions,seated,scale,basisL,basisR,current:null,clock:0,contacts,bindOffset:-box.min.y*scale};
+      const contacts=[],rigidContacts=[],limbContacts={handL:[],handR:[],footL:[],footR:[]};
+      if(!seated)model.traverse(mesh=>{
+        if(!mesh.isMesh)return;
+        const p=mesh.geometry.getAttribute('position');if(!p)return;
+        if(!mesh.isSkinnedMesh){for(let i=0;i<p.count;i++)rigidContacts.push({mesh,index:i});return;}
+        const weights=mesh.geometry.getAttribute('skinWeight'),joints=mesh.geometry.getAttribute('skinIndex'),seen=new Set();
+        for(let i=0;i<p.count;i++){
+          const key=[p.getX(i),p.getY(i),p.getZ(i),weights.getX(i),weights.getY(i),weights.getZ(i),weights.getW(i),joints.getX(i),joints.getY(i),joints.getZ(i),joints.getW(i)].map(n=>Math.round(n*1e6)).join('/');
+          if(seen.has(key))continue;seen.add(key);const sample={mesh,index:i};contacts.push(sample);
+          let dominant=0,best=-1;for(const get of ['getX','getY','getZ','getW']){const w=weights[get](i);if(w>best){best=w;dominant=joints[get](i);}}
+          if(Math.abs(p.getX(i))>.30){if(dominant===8)limbContacts.handL.push(sample);if(dominant===7)limbContacts.handR.push(sample);}
+          if(p.getY(i)<.045){if(dominant===10)limbContacts.footL.push(sample);if(dominant===9)limbContacts.footR.push(sample);}
+        }
+      });
+      const record={actor,id,model,visual,bones,rest,native,mixer,actions,seated,scale,basisL,basisR,current:null,clock:0,contacts,rigidContacts,limbContacts,bindOffset:-box.min.y*scale};
       if(!seated){
         // These lightweight props retain their public visibility handles, but follow actual GLB landmarks.
         for(const prop of [actor.microphone,actor.tearDrops,actor.sweatDrop])if(prop)actor.group.add(prop);
@@ -108,6 +120,7 @@
         if(actor.sweatDrop)actor.sweatDrop.scale.setScalar(1.5);
       }
       actor.fallbackMeshes.forEach(m=>m.visible=false);actor.modelAsset={file:(id==='viewer'?'yunfei':id)+'.glb',joints:11,clips:asset.animations.map(c=>c.name)};
+      actor.modelRig={bones,visual,model};
       records.push(record);if(seated)status.audience++;else if(id==='viewer')status.viewer=1;else status.characters++;
       return record;
     }
@@ -152,11 +165,75 @@
       const {actor:a,visual}=record;if(!a.group.visible)return;
       let lift=0;
       for(const {mesh,index} of record.contacts){mesh.boneTransform(index,tempV).applyMatrix4(mesh.matrixWorld);lift=Math.max(lift,surfaceAt(tempV.x,tempV.z)+.008-tempV.y);}
+      for(const {mesh,index} of record.rigidContacts){tempV.fromBufferAttribute(mesh.geometry.getAttribute('position'),index).applyMatrix4(mesh.matrixWorld);lift=Math.max(lift,surfaceAt(tempV.x,tempV.z)+.008-tempV.y);}
       if(lift>0){a.body.getWorldQuaternion(tempQ).invert();a.body.getWorldScale(worldScale);tempV.set(0,lift,0).applyQuaternion(tempQ).divide(worldScale);visual.position.add(tempV);visual.updateMatrixWorld(true);}
+      return lift;
+    }
+    const clamp01=v=>Math.max(0,Math.min(1,Number(v)||0));
+    function limbEnd(record,kind,side){
+      const bone=record.bones[(kind==='hand'?'forearm':'shin')+side];
+      return bone.localToWorld(kind==='hand'?new T.Vector3(side==='L'?-.13:.13,0,0):new T.Vector3(0,-.086,.028));
+    }
+    function limbClearance(record,kind,side){
+      let min=Infinity;for(const {mesh,index} of record.limbContacts[kind+side]){mesh.boneTransform(index,tempV).applyMatrix4(mesh.matrixWorld);min=Math.min(min,tempV.y-surfaceAt(tempV.x,tempV.z));}return min;
+    }
+    function ikLimb(record,kind,side,target,weight){
+      if(weight<=0)return;
+      const {actor:a,bones:b,rest}=record,upper=b[(kind==='hand'?'arm':'leg')+side],lower=b[(kind==='hand'?'forearm':'shin')+side];
+      const upperName=(kind==='hand'?'arm':'leg')+side,lowerName=(kind==='hand'?'forearm':'shin')+side;
+      const endAxis=kind==='hand'?new T.Vector3(side==='L'?-.13:.13,0,0):new T.Vector3(0,-.086,.028);
+      const origin=upper.getWorldPosition(new T.Vector3()),present=lower.localToWorld(endAxis.clone());
+      target=present.clone().lerp(target,clamp01(weight));
+      const size=upper.getWorldScale(new T.Vector3()),l1=rest[lowerName].position.length()*size.x,l2=endAxis.length()*size.x;
+      const direction=target.clone().sub(origin),distance=Math.max(.001,Math.min(direction.length(),(l1+l2)*.998));direction.normalize();
+      const along=(l1*l1-l2*l2+distance*distance)/(2*distance),height=Math.sqrt(Math.max(0,l1*l1-along*along));
+      const bend=(kind==='hand'?new T.Vector3(side==='L'?-1:1,.08,.14):new T.Vector3(0,0,1)).applyQuaternion(a.body.getWorldQuaternion(new T.Quaternion()));
+      bend.addScaledVector(direction,-bend.dot(direction));
+      if(bend.lengthSq()<1e-5)bend.set(1,0,0).addScaledVector(direction,-direction.x);bend.normalize();
+      const elbow=origin.clone().addScaledVector(direction,along).addScaledVector(bend,height),reached=origin.clone().addScaledVector(direction,distance);
+      function aim(bone,base,axis,from,to){
+        const desired=to.clone().sub(from).normalize().applyQuaternion(bone.parent.getWorldQuaternion(new T.Quaternion()).invert());
+        bone.quaternion.copy(new T.Quaternion().setFromUnitVectors(axis.clone().normalize().applyQuaternion(base),desired)).multiply(base);
+      }
+      aim(upper,rest[upperName].quaternion,rest[lowerName].position,origin,elbow);a.group.updateMatrixWorld(true);
+      aim(lower,rest[lowerName].quaternion,endAxis,lower.getWorldPosition(new T.Vector3()),reached);a.group.updateMatrixWorld(true);
+    }
+    function supportBreaking(record,breaking){
+      const {actor:a}=record,targets=[];
+      for(const [key,kind] of [['feet','foot'],['hands','hand']])for(const side of ['L','R']){
+        const point=breaking[key]?.[side];if(!point)continue;
+        const weight=clamp01(point.weight??breaking.floorWeight??breaking.weight);if(weight<=.001)continue;
+        const world=point.space==='world'?new T.Vector3(Number(point.x)||0,Number(point.y)||0,Number(point.z)||0):a.group.localToWorld(new T.Vector3(Number(point.x)||0,Number(point.y)||0,Number(point.z)||0));
+        const lift=point.ground?Math.max(0,Math.min(.4,Number(point.lift)||0)):0;
+        if(point.ground)world.y=surfaceAt(world.x,world.z)+.008+lift;
+        const start=limbEnd(record,kind,side);
+        if(point.ground&&kind==='foot'){const clearance=limbClearance(record,kind,side);if(clearance<.010+lift)start.y+=.010+lift-clearance;}
+        targets.push({kind,side,point,weight,world,solver:world.clone(),start,lift});
+      }
+      // Contact radius comes from the real skin, not from the wrist/ankle point.
+      // Iterating skin clearance and the two-bone solve leaves the palm/sole on
+      // the stage without raising the whole dancer until its hands float.
+      for(let pass=0;pass<7;pass++){
+        for(const target of targets){
+          const {kind,side,point,weight,world,solver,start,lift}=target;solver.copy(world);
+          if(point.ground){const end=limbEnd(record,kind,side),clearance=limbClearance(record,kind,side);solver.y=end.y-clearance+.010+lift;}
+          // Blend from the source wrist/ankle once; repeating a fractional
+          // solve four times would prematurely pin a hand during a transition.
+          solver.lerp(start,1-weight);ikLimb(record,kind,side,solver,1);
+        }
+        groundAvatar(record);a.group.updateMatrixWorld(true);
+      }
+      const report={hands:{},feet:{},world:true};
+      for(const {kind,side,weight,world,solver} of targets){
+        const actual=limbEnd(record,kind,side),clearance=limbClearance(record,kind,side);
+        report[kind==='hand'?'hands':'feet'][side]={weight,target:solver.toArray(),groundTarget:world.toArray(),actual:actual.toArray(),error:actual.distanceTo(solver),horizontalError:Math.hypot(actual.x-world.x,actual.z-world.z),clearance};
+      }
+      a.modelSupport=report;
     }
     function pose(record,dt,frame){
       const {actor:a,bones:b,rest,native,visual,mixer,seated}=record;
       const active=frame.cue?.actor===record.id,performance=a.performance||{};
+      const breaking=!seated?performance.breaking:null,breakingWeight=clamp01(breaking?.weight);
       visual.position.set(0,record.bindOffset,0);
       // Seated guests use explicit hip/knee source poses, so new knee joints never bend twice.
       const clip=seated?'idle':performance.walking?'walk':'idle';changeAction(record,clip);
@@ -165,6 +242,12 @@
       for(const [key,bone] of Object.entries(b)){bone.position.copy(native[key].position);bone.quaternion.copy(native[key].quaternion);bone.scale.copy(native[key].scale);}
       mixer.update(Math.max(0,Number(dt)||0));
       for(const [key,bone] of Object.entries(b)){native[key].position.copy(bone.position);native[key].quaternion.copy(bone.quaternion);native[key].scale.copy(bone.scale);}
+      if(breakingWeight>0){
+        for(const [key,bone] of Object.entries(b)){bone.position.lerp(rest[key].position,breakingWeight);bone.quaternion.slerp(rest[key].quaternion,breakingWeight);}
+        // Imported arms are in a T-pose; authored arm deltas use a downward arm.
+        b.armL.quaternion.multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0,0,1),Math.PI/2*breakingWeight));
+        b.armR.quaternion.multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0,0,1),-Math.PI/2*breakingWeight));
+      }
       const moving=!!performance.walking;
       const limbAmount=moving?.35:1;
       if(seated){
@@ -179,7 +262,7 @@
       b.head.quaternion.premultiply(sourceDelta(a.head,.85));
       for(const side of ['L','R']){
         const upper=b['arm'+side],lower=b['forearm'+side],basis=record['basis'+side];
-        upper.quaternion.premultiply(sourceDelta(a['arm'+side],moving?.45:.85));
+        upper.quaternion.premultiply(sourceDelta(a['arm'+side],breakingWeight>0?1:moving?.45:.85));
         // A source forearm points down -Y; the imported arm points sideways ±X.
         // Conjugating through that basis turns elbow flex into bending, rather than forearm twisting.
         tempQ2.copy(basis).multiply(a['forearm'+side].quaternion).multiply(tempQ.copy(basis).invert());
@@ -196,7 +279,7 @@
           const wipe=frame.cue.action==='wipe',x=wipe?-.12+.16*smooth((time-.9)/1.5):-.12+Math.sin(time*8)*.012;
           const target=b.head.localToWorld(new T.Vector3(x,wipe?.19:.15,wipe?.13:.15));ikArm(record,'L',target,amount);
         }
-        groundAvatar(record);
+        if(breakingWeight>0)supportBreaking(record,breaking);else{groundAvatar(record);a.modelSupport=null;}
         if(a.microphone){
           // Right hand is at the end of the extended left-named model arm (+X in bind space).
           tempV.set(.13,0,0);b.forearmR.localToWorld(tempV);a.group.worldToLocal(tempV);a.microphone.position.copy(tempV);
