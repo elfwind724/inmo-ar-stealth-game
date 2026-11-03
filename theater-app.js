@@ -16,7 +16,7 @@
     venue.viewer.performance={walking:false,speed:0};
     const performance=TheaterPerformance.create({venue});
     const show=TheaterShow.create(),state=show.state;
-    const viewer={x:0,z:7.8,yaw:0,pitch:.055,mode:'first',walking:0,heading:Math.PI};
+    const viewer={x:0,z:3.2,yaw:0,pitch:.055,mode:'first',walking:0,heading:Math.PI};
     let menu=false,roaming=false,lastStamp=0,poseTime=0,lastCue='',currentStageTitle='',reaction='',reactionUntil=0,roamStarted=false;
     const keys=new Set(),movePointers=new Map();let lookPointer=null,lookX=0,lookY=0;
     const pointerAllowed=()=>!menu&&!document.hidden&&state.phase!=='READY';
@@ -90,7 +90,7 @@
       $('quick-view').setAttribute('aria-label','切换视角，当前'+viewNames[viewer.mode]);
       document.body.classList.toggle('overhead',viewer.mode==='overhead');document.body.dataset.view=viewer.mode;
     }
-    function resetView(){viewer.x=0;viewer.z=7.8;viewer.yaw=0;viewer.pitch=.055;viewer.heading=Math.PI;}
+    function resetView(){viewer.x=0;viewer.z=3.2;viewer.yaw=0;viewer.pitch=.055;viewer.heading=Math.PI;}
     function setView(){const modes=['first','third','overhead'];viewer.mode=modes[(modes.indexOf(viewer.mode)+1)%3];clearInput();viewUI();}
     function start(replay=false){
       cancelVoice();show.restart();menu=false;roaming=false;roamStarted=false;lastCue='';currentStageTitle='';poseTime=0;reaction='';reactionUntil=0;lastReactionAt=-100;
