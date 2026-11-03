@@ -133,11 +133,12 @@
     });
     function updateViewer(dt){
       let moving=false;
-      if(pointerAllowed()&&viewer.mode!=='overhead'){
+      if(pointerAllowed()){
         const virtual=new Set(movePointers.values());let forward=Number(keys.has('KeyW')||keys.has('ArrowUp')||virtual.has('forward'))-Number(keys.has('KeyS')||keys.has('ArrowDown')||virtual.has('backward'));
         let right=Number(keys.has('KeyD')||keys.has('ArrowRight')||virtual.has('right'))-Number(keys.has('KeyA')||keys.has('ArrowLeft')||virtual.has('left'));
         const n=Math.hypot(forward,right)||1;forward/=n;right/=n;
-        const dx=(-Math.sin(viewer.yaw)*forward+Math.cos(viewer.yaw)*right)*dt*2.6,dz=(-Math.cos(viewer.yaw)*forward-Math.sin(viewer.yaw)*right)*dt*2.6;
+        const moveYaw=viewer.mode==='overhead'?Math.PI/4:viewer.yaw;
+        const dx=(-Math.sin(moveYaw)*forward+Math.cos(moveYaw)*right)*dt*2.6,dz=(-Math.cos(moveYaw)*forward-Math.sin(moveYaw)*right)*dt*2.6;
         // Central aisle plus the empty cross-aisle: chairs are never walked through.
         const nx=clamp(viewer.x+dx,-10.5,10.5),nz=clamp(viewer.z+dz,-3.1,18);
         if(Math.abs(nx)<.83||nz<-.7||nz>17.1){moving=Math.abs(nx-viewer.x)+Math.abs(nz-viewer.z)>.00001;viewer.x=nx;viewer.z=nz;viewer.walking+=(Math.abs(forward)+Math.abs(right))*dt;if(moving)viewer.heading=Math.atan2(dx,dz);}
