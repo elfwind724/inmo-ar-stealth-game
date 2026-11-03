@@ -18,6 +18,9 @@
     const show=TheaterShow.create(),state=show.state;
     const viewer={x:0,z:3.2,yaw:0,pitch:.055,mode:'first',walking:0,heading:Math.PI};
     let menu=false,roaming=false,lastStamp=0,poseTime=0,lastCue='',currentStageTitle='',reaction='',reactionUntil=0,roamStarted=false;
+    let encoreActive=false,encoreElapsed=0,nextEncoreCheer=0,encoreCheerIndex=0;
+    const encoreCue={id:'encore-dance',actor:'xiaoying',action:'dance',duration:16,chapter:'返场 · 四人齐舞'};
+    const encoreCheers=['欢迎返场！再来一支！','小影领舞，掌声跟上！','云飞哥，这次可以不朗诵！','爵爷稳住，这次别退场！','小仓鼠：不跳绳，跳舞！','四位太会了！今晚的快乐不散场！'];
     const keys=new Set(),movePointers=new Map();let lookPointer=null,lookX=0,lookY=0;
     const pointerAllowed=()=>!menu&&!document.hidden&&state.phase!=='READY';
     const paused=()=>menu||document.hidden;
@@ -52,7 +55,7 @@
           const b=ac.createBuffer(1,Math.ceil(ac.sampleRate*dur),ac.sampleRate),data=b.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1);
           const s=ac.createBufferSource(),g=ac.createGain(),f=ac.createBiquadFilter();s.buffer=b;f.type=filter;f.frequency.value=filter==='highpass'?1500:450;g.gain.setValueAtTime(gain,now+at);g.gain.exponentialRampToValueAtTime(.001,now+at+dur);s.connect(f).connect(g).connect(ac.destination);s.start(now+at);s.stop(now+at+dur);
         }
-        if(kind==='clap'){for(let i=0;i<17;i++)noise(i*.075+Math.random()*.035,.12,.06);}
+        if(kind==='clap'||kind==='cheer'){for(let i=0;i<17;i++)noise(i*.075+Math.random()*.035,.12,.06);if(kind==='cheer')[440,554,659].forEach((f,i)=>tone(f,.15+i*.12,.25,.022,'triangle'));}
         else if(kind==='laugh'){for(let i=0;i<8;i++)tone(180+Math.random()*100,i*.13,.12,.035,'triangle');}
         else if(kind==='boo'){tone(145,0,.7,.045);tone(160,.08,.75,.04);}
         else if(kind==='thud'){tone(66,0,.32,.2,'triangle');noise(0,.14,.16,'lowpass');}
@@ -61,9 +64,9 @@
         else if(kind==='chime'){[659,880,1046].forEach((f,i)=>tone(f,i*.14,.5,.035));}
       }catch{}
     }
-    const reactionNames={clap:'掌声响起来！',laugh:'全场：哈哈哈哈！',boo:'观众席：下去咯！下去咯！',murmur:'观众席：怎么黑了？'};
+    const reactionNames={clap:'掌声响起来！',cheer:'欢迎返场！再来一支！',laugh:'全场：哈哈哈哈！',boo:'观众席：下去咯！下去咯！',murmur:'观众席：怎么黑了？'};
     function react(kind,manual=false){
-      if(manual&&(paused()||state.phase!=='PLAYING'||poseTime-lastReactionAt<1.5))return;
+      if(manual&&(paused()||state.phase!=='PLAYING'&&!encoreActive||poseTime-lastReactionAt<1.5))return;
       if(manual)lastReactionAt=poseTime;
       reaction=kind;reactionUntil=poseTime+3;$('reaction-toast').textContent=reactionNames[kind]||'全场欢呼！';$('reaction-toast').hidden=false;
       if(kind!=='murmur')effect(kind);
@@ -94,6 +97,7 @@
     function setView(){const modes=['first','third','overhead'];viewer.mode=modes[(modes.indexOf(viewer.mode)+1)%3];clearInput();viewUI();}
     function start(replay=false){
       cancelVoice();show.restart();menu=false;roaming=false;roamStarted=false;lastCue='';currentStageTitle='';poseTime=0;reaction='';reactionUntil=0;lastReactionAt=-100;
+      encoreActive=false;encoreElapsed=0;nextEncoreCheer=0;encoreCheerIndex=0;document.body.classList.remove('encore');
       for(const a of Object.values(venue.actors)){a.group.visible=false;a.group.position.set(-10,.75,-9);a.group.rotation.set(0,0,0);}
       const host=venue.actors.xiaoying;host.group.visible=true;host.group.position.set(0,.75,-8.3);
       performance.reset();
@@ -107,6 +111,25 @@
     $('reset-view').addEventListener('click',resetView);$('view-toggle').addEventListener('click',setView);$('quick-view').addEventListener('click',setView);
     $('voice-toggle').addEventListener('click',()=>{voiceOn=!voiceOn;try{localStorage.setItem('inmo_theater_voice',String(voiceOn));}catch{}cancelVoice();voiceUI();});
     $('ending-roam').addEventListener('click',()=>{$('ending').hidden=true;roaming=true;roamStarted=true;canvas.focus();});
+    $('ending-exit').addEventListener('click',()=>location.reload());
+    function beginEncore(){
+      if(encoreActive)return;
+      encoreActive=true;encoreElapsed=0;nextEncoreCheer=0;encoreCheerIndex=0;roamStarted=true;
+      document.body.dataset.cue='encore-dance';
+      ['yunfei','xiaoying','hamster','weijue'].forEach((id,index)=>{
+        const actor=venue.actors[id];
+        if(!actor.group.visible||Math.abs(actor.group.position.x)>9){actor.group.position.set(-3.3+index*2.2,venue.stageY,-7.8);actor.group.rotation.set(0,0,0);}
+      });
+      cancelVoice();document.body.classList.add('encore');$('ending').hidden=false;$('subtitles').hidden=true;$('reaction-controls').hidden=false;
+      $('chapter-label').textContent=encoreCue.chapter;$('cue-counter').textContent='循环演出';
+      venue.setStageTitle?.('全员返场','ENCORE · 掌声不要停');
+    }
+    $('jump-encore').addEventListener('click',()=>{
+      if(state.phase==='READY')start();
+      setMenu(false);
+      while(state.phase==='PLAYING')show.next();
+      beginEncore();canvas.focus();music.update();
+    });
     function next(){if(state.phase==='PLAYING'&&!paused()){show.next();syncCue();}}
     $('next-line').addEventListener('click',next);document.querySelectorAll('[data-reaction]').forEach(b=>b.addEventListener('click',()=>react(b.dataset.reaction,true)));
     document.addEventListener('keydown',e=>{
@@ -155,7 +178,7 @@
       const step=Math.sin(viewer.walking*7);avatar.legL.rotation.x=moving?step*.35:0;avatar.legR.rotation.x=moving?-step*.35:0;avatar.shinL.rotation.x=moving?Math.max(0,-step)*.5:0;avatar.shinR.rotation.x=moving?Math.max(0,step)*.5:0;avatar.armL.rotation.x=moving?-step*.28:0;avatar.armR.rotation.x=moving?step*.28:0;
       camera.updateProjectionMatrix();
     }
-    function poseActors(dt){performance.update(dt,{time:poseTime,cue:state.cue,localTime:state.localTime,phase:state.phase});}
+    function poseActors(dt){performance.update(dt,{time:poseTime,cue:encoreActive?encoreCue:state.cue,localTime:encoreActive?encoreElapsed:state.localTime,phase:encoreActive?'ENCORE':state.phase});}
     let models=null;
     Promise.resolve(TheaterModels.load({THREE:T,venue})).then(m=>{models=m;document.body.dataset.models=m?.status?.phase||'ready';}).catch(error=>{console.warn('Imported models unavailable; authored stage characters remain.',error);document.body.dataset.models='fallback';});
     function label(){
@@ -177,16 +200,21 @@
         const remaining=state.cue.duration-state.localTime;
         const voiceFinishing=voiceOn&&speech?.speaking&&voicedCue===state.cue.id&&!state.cue.blackout&&poseTime-spokenAt<state.cue.duration+6&&remaining<=dt;
         show.update(voiceFinishing?Math.max(0,remaining-.0001):dt);
-        if(state.phase==='PLAYING'){syncCue();poseActors(dt);}
-        if(state.phase==='ENDED'&&!roamStarted){$('ending').hidden=false;$('subtitles').hidden=true;$('reaction-controls').hidden=true;cancelVoice();roamStarted=true;}
+        if(state.phase==='PLAYING')syncCue();
+        if(state.phase==='ENDED'&&!encoreActive)beginEncore();
+        if(encoreActive){
+          encoreElapsed+=dt;
+          if(encoreElapsed>=nextEncoreCheer){react('cheer');$('reaction-toast').textContent=encoreCheers[encoreCheerIndex++%encoreCheers.length];nextEncoreCheer=encoreElapsed+5.5;}
+        }
+        if(state.phase==='PLAYING'||encoreActive)poseActors(dt);
         if(poseTime>reactionUntil){reaction='';$('reaction-toast').hidden=true;}
-        venue.update(dt,{time:poseTime,cue:state.cue,localTime:state.localTime,reaction,blackout:state.phase==='PLAYING'&&state.cue.blackout?1:0});
+        venue.update(dt,{time:poseTime,cue:encoreActive?encoreCue:state.cue,localTime:encoreActive?encoreElapsed:state.localTime,reaction:encoreActive?'cheer':reaction,encore:encoreActive,blackout:state.phase==='PLAYING'&&state.cue.blackout?1:0});
         updateViewer(dt);
-        models?.update?.(dt,{time:poseTime,cue:state.cue,localTime:state.localTime,reaction});
+        models?.update?.(dt,{time:poseTime,cue:encoreActive?encoreCue:state.cue,localTime:encoreActive?encoreElapsed:state.localTime,reaction});
       }
       const dark=state.phase==='PLAYING'&&!!state.cue.blackout;$('blackout').classList.toggle('on',dark);document.body.classList.toggle('power-out',dark);$('blackout').setAttribute('aria-hidden',String(!dark));
-      $('cue-progress-fill').style.width=clamp(state.localTime/state.cue.duration*100,0,100)+'%';document.body.dataset.phase=state.phase;document.body.dataset.paused=String(paused());
-      audio.volume=speech?.speaking ? .08 : .19;music.update();label();renderer.render(scene,camera);
+      $('cue-progress-fill').style.width=clamp(state.localTime/state.cue.duration*100,0,100)+'%';document.body.dataset.phase=state.phase;document.body.dataset.encore=String(encoreActive);document.body.dataset.paused=String(paused());
+      audio.volume=speech?.speaking ? .08 : (encoreActive ? .25 : .19);music.update();label();renderer.render(scene,camera);
     }
     canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();setMenu(true);$('boot-error').hidden=false;});
     requestAnimationFrame(frame);

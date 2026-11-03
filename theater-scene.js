@@ -209,12 +209,18 @@
     }
     batchStatic();batchStatic(chairRoot);
     let lastCue='',lastTime=0;
+    const baseLightColors=stageLights.map(light=>light.color.clone());
+    const encoreWarm=new T.Color(0xffc26d),encoreRose=new T.Color(0xe29bd0);
     function update(dt,frame={}){
       const time=Number(frame.time)||0,reaction=frame.reaction||'',cue=frame.cue||{};lastTime=time;
       if(frame.blackout!==undefined)setBlackout(frame.blackout);
+      for(let i=0;i<stageLights.length;i++){
+        const light=stageLights[i];light.color.copy(baseLightColors[i]);light.intensity=baseIntensities[i]*(1-blackout);
+        if(frame.encore&&i>0){const pulse=.5+.5*Math.sin(time*.8+i*1.8);light.color.lerp(i%2?encoreWarm:encoreRose,.28+.16*pulse);light.intensity*=1+.10*pulse;}
+      }
       const title=cue.stageTitle||cue.title||cue.section;
       if(title&&title!==lastCue){lastCue=title;setStageTitle(title,cue.subtitle||'INMO COMMUNITY · 群友特别场');}
-      for(const {beam,from,to,phase} of beams){const target=to.clone();target.x+=Math.sin(time*.22+phase)*.65;const delta=target.sub(from),length=delta.length();beam.position.copy(from).addScaledVector(delta,.5);beam.quaternion.setFromUnitVectors(new T.Vector3(0,-1,0),delta.normalize());beam.scale.set(length*.21,length,length*.21);beam.material.opacity=.025*(1-blackout);}
+      for(const {beam,from,to,phase} of beams){const target=to.clone();target.x+=Math.sin(time*(frame.encore?.8:.22)+phase)*(frame.encore?2.0:.65);const delta=target.sub(from),length=delta.length();beam.position.copy(from).addScaledVector(delta,.5);beam.quaternion.setFromUnitVectors(new T.Vector3(0,-1,0),delta.normalize());beam.scale.set(length*.21,length,length*.21);beam.material.opacity=(frame.encore?.04:.025)*(1-blackout);}
       for(const a of audience){
         const p=a.phase,wiggle=Math.sin(time*1.5+p),laugh=/laugh|笑|cheer|欢呼/.test(reaction),boo=/boo|嘘|起哄/.test(reaction),clap=/clap|applause|掌|cheer|欢呼/.test(reaction);
         a.group.position.y=laugh?Math.abs(Math.sin(time*7+p))*.055:0;a.head.rotation.x=laugh?-.10+Math.sin(time*9+p)*.08:Math.sin(time*.7+p)*.025;a.head.rotation.y=Math.sin(time*.39+p)*.08;
@@ -222,6 +228,7 @@
         a.armR.rotation.set(clap?-1.04:boo?-1.9+.18*wiggle:-.72,0,clap?.38-Math.sin(time*13+p)*.13:boo?.28:0);
         a.forearmL.rotation.x=clap?-1.15:boo?-.15:-.8;a.forearmR.rotation.x=clap?-1.15:boo?-.15:-.8;
         a.forearmL.rotation.z=clap?-.4:.05;a.forearmR.rotation.z=clap?.4:-.05;
+        if(frame.encore&&Math.sin(time*.65+p)>.9){a.armL.rotation.x=-2.1;a.armR.rotation.x=-2.1;a.forearmL.rotation.x=-.28;a.forearmR.rotation.x=-.28;}
         a.mouth.scale.y=laugh?1.8:1;
       }
     }

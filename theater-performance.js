@@ -12,6 +12,7 @@
   function create({venue}){
     const actors=venue.actors,stageY=venue.stageY??.75,origins=new Map();
     let cueId='';
+    const encoreOrigins=new Map();
     const temp=actors.xiaoying.group.position.clone();
 
     function neutral(a){
@@ -24,7 +25,7 @@
       if(a.rope){a.rope.visible=false;a.rope.rotation.x=0;}
     }
     function reset(){
-      cueId='';origins.clear();
+      cueId='';origins.clear();encoreOrigins.clear();
       for(const [id,a] of Object.entries(actors)){
         neutral(a);a.group.position.set(-10,stageY,-9);a.group.rotation.set(0,0,0);
         a.group.visible=id==='xiaoying';
@@ -91,8 +92,111 @@
       if(correction>0){g.position.y+=correction;g.updateMatrixWorld(true);}
     }
 
+    function updateEncore(dt,frame){
+      const time=Math.max(0,Number(frame.localTime)||0),cycle=time%16;
+      // Keep the curtain-call order: nobody crosses through a neighbour while
+      // the two centre performers exchange their earlier speaking positions.
+      const order=['yunfei','xiaoying','hamster','weijue'];
+      if(cueId!=='encore-dance'){
+        cueId='encore-dance';encoreOrigins.clear();
+        for(const id of order){
+          const a=actors[id],r=a.group.rotation,p={};
+          for(const name of joints){const j=a[name]?.rotation;p[name]=j?[j.x,j.y,j.z]:[0,0,0];}
+          p.torso=a.body?.rotation.x||0;p.torsoSide=a.body?.rotation.z||0;
+          encoreOrigins.set(id,{x:a.group.position.x,y:a.group.position.y,z:a.group.position.z,rx:r.x,ry:r.y,rz:r.z,pose:p});
+        }
+      }
+      const intro=progress(time,0,1.2),tau=Math.PI*2;
+      // 120 BPM, four eight-count phrases. Every phrase modifier has zero
+      // position and velocity at its endpoints; the base groove repeats too.
+      const beat=tau*cycle/.5,groove=tau*cycle/2,slow=tau*cycle/4;
+      const section=Math.min(3,Math.floor(cycle/4)),within=cycle-section*4;
+      const envelope=Math.sin(Math.PI*within/4)**2;
+      for(let i=0;i<order.length;i++){
+        const id=order[i],a=actors[id];if(!a)continue;
+        const g=a.group,origin=encoreOrigins.get(id),style=[1.0,1.08,.87,1.02][i];
+        const direction=i%2?-1:1,sway=Math.sin(groove),accent=Math.sin(groove+Math.PI/2);
+        const pulseBeat=(1-Math.cos(beat))*.5;
+        const p={
+          head:angles(-.035+.035*Math.sin(slow),-.065*sway,-.065*sway),
+          armL:angles(-.43-.10*accent,.05,-.27-.075*sway),
+          armR:angles(-.43+.10*accent,-.05,.27-.075*sway),
+          forearmL:angles(-1.02+.10*Math.sin(groove+.5),.08*Math.sin(groove),-.10),
+          forearmR:angles(-1.02+.10*Math.sin(groove+Math.PI+.5),-.08*Math.sin(groove),.10),
+          legL:angles(-.06-.04*accent,0,.09+.065*sway),
+          legR:angles(-.06+.04*accent,0,-.09+.065*sway),
+          shinL:angles(.14+.11*(1-accent)*.5),shinR:angles(.14+.11*(1+accent)*.5),
+          torso:.028*Math.sin(groove-Math.PI/3),torsoSide:-.105*sway*style
+        };
+        let x=-3.3+i*2.2+.135*sway*style,z=-7.8+.045*Math.sin(slow),yaw=.115*Math.sin(groove),roll=.026*sway;
+        let y=stageY+.02*pulseBeat;
+        if(section===0){
+          // Hip figure-eights, a fan of the hands beside the face, then an
+          // open-palmed invitation. The torso counter-rotates over the hips.
+          p.torsoSide-=envelope*.065*Math.sin(groove+.45)*style;
+          p.torso+=envelope*.055*Math.sin(slow);
+          p.armL[0]-=envelope*(.50+.20*Math.sin(groove));
+          p.armR[0]-=envelope*(.50-.20*Math.sin(groove));
+          p.armL[2]-=envelope*.24;p.armR[2]+=envelope*.24;
+          p.forearmL[1]+=envelope*.30*Math.sin(groove+.6);
+          p.forearmR[1]-=envelope*.30*Math.sin(groove+.6);
+          p.forearmL[2]-=envelope*.21*Math.cos(groove);p.forearmR[2]-=envelope*.21*Math.cos(groove);
+          yaw+=envelope*.17*Math.sin(slow);
+        }else if(section===1){
+          // Compact crossing steps: knees soften on the weight shift while
+          // the opposite shoulder and hand draw an S-shaped flourish.
+          const step=Math.sin(groove),cross=Math.sin(slow);
+          x+=envelope*.12*step;z+=envelope*.10*Math.sin(groove-Math.PI/2);
+          p.legL[2]+=envelope*.15*cross;p.legR[2]+=envelope*.15*cross;
+          p.legL[0]-=envelope*.16*Math.max(0,step);p.legR[0]-=envelope*.16*Math.max(0,-step);
+          p.shinL[0]+=envelope*.20*Math.max(0,step);p.shinR[0]+=envelope*.20*Math.max(0,-step);
+          p.armL[0]-=envelope*(.35+.30*Math.sin(slow));p.armR[0]-=envelope*(.35-.30*Math.sin(slow));
+          p.forearmL[0]-=envelope*.25;p.forearmR[0]-=envelope*.25;
+          p.head[1]+=envelope*.17*Math.sin(slow);p.torsoSide+=envelope*.045*Math.sin(groove+.75);
+        }else if(section===2){
+          // Alternating overhead arcs with elbows and wrists following a
+          // delayed wave, plus a small body roll rather than a rigid lean.
+          const wave=Math.sin(slow),shoulder=Math.sin(groove-.25);
+          p.armL[0]-=envelope*(1.35+.22*wave);p.armR[0]-=envelope*(1.35-.22*wave);
+          p.armL[2]-=envelope*.22;p.armR[2]+=envelope*.22;
+          p.forearmL[0]+=envelope*.30*Math.sin(slow-.55);p.forearmR[0]-=envelope*.30*Math.sin(slow-.55);
+          p.forearmL[2]+=envelope*.22*Math.sin(groove-.6);p.forearmR[2]+=envelope*.22*Math.sin(groove-.6);
+          p.head[0]+=envelope*.065*Math.sin(groove+.65);p.torso+=envelope*.075*shoulder;
+          yaw+=envelope*.24*wave;
+        }else{
+          // A full shared turn lands on the beat, followed by a playful
+          // shoulder pose. 2π and 0 are the same final orientation, and the
+          // turn's easing has zero velocity at that reset point.
+          const turn=progress(within,.20,2.25);
+          yaw+=within<2.25?tau*turn:0;
+          const flourish=pulse(within,.20,.65,1.65,2.35),pose=pulse(within,2.25,2.60,3.30,3.85);
+          p.armL[0]-=flourish*.85+pose*.75;p.armR[0]-=flourish*.85;
+          p.armL[2]-=flourish*.50;p.armR[2]+=flourish*.50;
+          p.forearmL[0]-=pose*.50;p.forearmR[0]-=pose*.42;
+          p.head[2]-=pose*.10*direction;p.head[1]+=pose*.18*direction;
+          p.torsoSide-=pose*.06*direction;
+          p.legL[0]-=pose*.10;p.shinL[0]+=pose*.16;
+        }
+        // A little individual charm, still on the same count and formation.
+        p.head[2]+=.018*direction*Math.sin(slow);
+        if(id==='weijue')p.torsoSide*=1.10;
+        if(id==='hamster'){p.shinL[0]+=.035*pulseBeat;p.shinR[0]+=.035*pulseBeat;}
+        if(id==='xiaoying'){p.forearmL[2]-=.055*Math.sin(groove);p.forearmR[2]+=.055*Math.sin(groove);}
+        for(const name of joints)p[name]=p[name].map((value,k)=>mix(origin.pose[name][k],value,intro));
+        p.torso=mix(origin.pose.torso,p.torso,intro);p.torsoSide=mix(origin.pose.torsoSide,p.torsoSide,intro);
+        g.visible=true;g.position.set(mix(origin.x,x,intro),mix(origin.y,y,intro),mix(origin.z,z,intro));
+        g.rotation.set(mix(origin.rx,0,intro),mix(origin.ry,yaw,intro),mix(origin.rz,roll,intro));
+        setPose(a,p,1);
+        if(a.mouth)a.mouth.scale.y=1.1+.1*pulseBeat;
+        for(const prop of [a.microphone,a.tearDrops,a.sweatDrop,a.rope])if(prop)prop.visible=false;
+        guardGround(a);
+        a.performance={action:'dance',walking:false,speed:0,grounded:true,beat:(cycle%.5)/.5,loopPhase:cycle/16};
+      }
+    }
+
     function update(dt,frame={}){
       const cue=frame.cue;if(!cue)return;
+      if(frame.phase==='ENCORE'){updateEncore(dt,frame);return;}
       if(frame.phase==='READY'||frame.phase==='ENDED')return;
       const time=Math.max(0,Number(frame.localTime)||0),clock=Number(frame.time)||0;
       const duration=Math.max(1,cue.duration||5),active=cue.actor,action=cue.action||'talk';

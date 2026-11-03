@@ -21,3 +21,5 @@ Node >=20。npm install 后 npm run build 生成 dist/；npm run dev 在4173端�
 release/inmo_launch_event.html 和 release/inmo_3d_ar_optimized.html 是内嵌音乐、照片、模型、依赖的离线单文件。
 
 模型来源及许可详见 assets/theater-models/LICENSES.md。原始品牌展台照片由用户提供。
+
+谢幕后自动进入四人16秒循环返场舞，观众持续鼓掌欢呼，舞台暖金/粉紫灯束缓慢交替。设置中“直接看谢幕舞”可跳到返场；可暂停、切换视角、自由走动、重看或离场。

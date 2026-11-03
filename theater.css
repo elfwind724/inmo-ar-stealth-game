@@ -9,3 +9,9 @@
 .power-out .subtitles{z-index:21;background:#050507e8;border-color:#585355;color:#e7e1da}.power-out .topbar{z-index:22}.power-out .show-status{display:none}
 
 @media(pointer:coarse) and (min-width:601px){.subtitles{width:min(710px,calc(100% - 360px))}}
+
+/* The encore keeps the stage visible and the controls within reach. */
+.ending.encore-dock{inset:auto;left:50%;bottom:38px;transform:translateX(-50%);width:min(710px,calc(100% - 360px));padding:15px 20px;display:flex;flex-direction:row;justify-content:space-between;gap:14px;border:1px solid #d6b8804a;border-top:2px solid var(--gold);border-radius:9px;background:#11151de8;box-shadow:0 10px 45px #0007;backdrop-filter:blur(12px);text-align:left}.encore-dock .eyebrow{font-size:8px;letter-spacing:2px}.ending.encore-dock h2{font-size:16px;margin:7px 0 0;font-weight:600}.encore-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.encore-actions button{font-size:10px;padding:9px 10px;white-space:nowrap}.encore-actions button:first-child{border-color:#f4cc7870;color:var(--gold)}
+@media(max-width:900px){.ending.encore-dock{bottom:24px;padding:12px;flex-wrap:wrap}.ending.encore-dock h2{font-size:14px}.encore-actions{width:100%;justify-content:flex-start}}
+@media(max-width:600px) and (orientation:portrait){.ending.encore-dock{width:calc(100% - 28px);bottom:max(155px,calc(env(safe-area-inset-bottom) + 145px));gap:11px}}
+@media(max-height:500px){.ending.encore-dock{bottom:13px;padding:10px;gap:8px;flex-wrap:nowrap}.encore-actions{width:auto}}
