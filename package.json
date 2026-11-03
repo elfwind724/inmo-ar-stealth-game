@@ -1,12 +1,12 @@
 {
   "name": "inmo-ar-stealth-game",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "private": true,
-  "description": "INMO launch-event key puzzle and stealth challenge",
+  "description": "First-person INMO community comedy theater",
   "scripts": {
     "build": "node tools/build.mjs",
     "dev": "node tools/serve.mjs",
-    "test": "node --test tests/game-rules.test.cjs tests/runtime.test.cjs"
+    "test": "node --test tests/theater-show.test.cjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",

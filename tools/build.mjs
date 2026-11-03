@@ -1,40 +1,38 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const dist=path.join(root,'dist');
-await fs.mkdir(path.join(dist,'assets'),{recursive:true});await fs.mkdir(path.join(dist,'vendor'),{recursive:true});
-execFileSync(process.execPath,[path.join(root,'node_modules/tailwindcss/lib/cli.js'),'-c',path.join(root,'tailwind.config.cjs'),'-i',path.join(root,'styles/tailwind.css'),'-o',path.join(dist,'assets/ui.css'),'--minify'],{cwd:root,stdio:'inherit'});
+const dist=path.resolve(root,'dist');
+// Only this generated output directory is replaced, never project sources.
+if(path.dirname(dist)!==root||path.basename(dist)!=='dist')throw new Error('Unsafe output path');
+await fs.rm(dist,{recursive:true,force:true});
+await fs.mkdir(path.join(dist,'assets'),{recursive:true});
+await fs.mkdir(path.join(dist,'vendor'),{recursive:true});
 let html=await fs.readFile(path.join(root,'index.html'),'utf8');
-html=html.replace('<script src="https://cdn.tailwindcss.com/3.4.17"></script>','<link rel="stylesheet" href="./assets/ui.css">').replace('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js','./vendor/three.min.js').replace(/^\s*<link[^>]+(?:fonts\.googleapis|fonts\.gstatic)[^>]*>\s*$/gm,'');
+html=html.replace('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js','./vendor/three.min.js');
+const scripts=['showroom-assets.js','theater-show.js','theater-scene.js','theater-models.js','theater-performance.js','venue-music.js','theater-app.js'];
+for(const file of [...scripts,'theater.css'])await fs.copyFile(path.join(root,file),path.join(dist,file));
+for(const [from,to] of [['build/three.min.js','three.min.js'],['examples/js/loaders/GLTFLoader.js','GLTFLoader.js'],['examples/js/utils/SkeletonUtils.js','SkeletonUtils.js'],['LICENSE','THREE-LICENSE.txt']])await fs.copyFile(path.join(root,'node_modules/three',from),path.join(dist,'vendor',to));
+const assets=['venue-bgm.mp3','booth-reference-wide.jpg','booth-reference-close.jpg'];
+for(const file of assets)await fs.copyFile(path.join(root,'assets',file),path.join(dist,'assets',file));
+const models=path.join(root,'assets/theater-models');
+await fs.cp(models,path.join(dist,'assets/theater-models'),{recursive:true});
 await fs.writeFile(path.join(dist,'index.html'),html);
-const jsFiles=['game-rules.js','showroom-assets.js','launch-venue.js','launch-puzzle.js','launch-intro.js','venue-music.js','chase-runner.js'];
-const cssFiles=['ui-polish.css','launch-event.css','chase-runner.css'];
-for(const file of [...jsFiles,...cssFiles])await fs.copyFile(path.join(root,file),path.join(dist,file));
-await fs.copyFile(path.join(root,'node_modules/three/build/three.min.js'),path.join(dist,'vendor/three.min.js'));
-await fs.copyFile(path.join(root,'node_modules/three/LICENSE'),path.join(dist,'vendor/THREE-LICENSE.txt'));
-const music=await fs.readFile(path.join(root,'assets/venue-bgm.mp3'));
-await fs.writeFile(path.join(dist,'assets/venue-bgm.mp3'),music);
-const boothPhotos=['booth-reference-wide.jpg','booth-reference-close.jpg'];
-for(const file of boothPhotos)await fs.copyFile(path.join(root,'assets',file),path.join(dist,'assets',file));
 let standalone=html;
-standalone=standalone.replace('src="./assets/venue-bgm.mp3"',()=> 'src="data:audio/mpeg;base64,'+music.toString('base64')+'"');
-const inlineScript=code=>'<script>\n'+code.replace(/<\/script/gi,'<\\/script')+'\n</script>';
-for(const file of [...cssFiles,'assets/ui.css']){
-  const css=await fs.readFile(path.join(dist,file),'utf8');
-  standalone=standalone.replace('<link rel="stylesheet" href="./'+file+'">',()=>'<style>'+css+'</style>');
-}
-for(const file of [...jsFiles,'vendor/three.min.js']){
+const mime={'.jpg':'image/jpeg','.mp3':'audio/mpeg','.glb':'model/gltf-binary','.png':'image/png'};
+const assetData={};
+for(const file of assets){const data=await fs.readFile(path.join(root,'assets',file));assetData[file]='data:'+mime[path.extname(file)]+';base64,'+data.toString('base64');}
+const modelData={};
+async function embedModels(dir,prefix){for(const item of await fs.readdir(dir,{withFileTypes:true})){const file=path.join(dir,item.name),name=prefix+'/'+item.name;if(item.isDirectory())await embedModels(file,name);else if(mime[path.extname(file)])modelData[name]='data:'+mime[path.extname(file)]+';base64,'+(await fs.readFile(file)).toString('base64');}}
+await embedModels(models,'./assets/theater-models');
+const inline=code=>'<script>\n'+code.replace(/<\/script/gi,'<\\/script')+'\n</script>';
+standalone=standalone.replace('<script src="./theater-models.js"></script>',()=>inline('window.THEATER_MODEL_DATA='+JSON.stringify(modelData)+';')+'<script src="./theater-models.js"></script>');
+for(const file of [...scripts,'vendor/three.min.js','vendor/GLTFLoader.js','vendor/SkeletonUtils.js']){
   const code=await fs.readFile(path.join(dist,file),'utf8');
-  standalone=standalone.replace('<script src="./'+file+'"></script>',()=>inlineScript(code));
+  standalone=standalone.replace('<script src="./'+file+'"></script>',()=>inline(code));
 }
-for(const file of boothPhotos){
-  const data=await fs.readFile(path.join(root,'assets',file));
-  standalone=standalone.replaceAll('./assets/'+file,'data:image/jpeg;base64,'+data.toString('base64'));
-}
-const license=await fs.readFile(path.join(dist,'vendor/THREE-LICENSE.txt'),'utf8');
-standalone='<!-- '+license+' -->\n'+standalone;
+for(const [file,data] of Object.entries(assetData))standalone=standalone.replaceAll('./assets/'+file,data);
+const css=await fs.readFile(path.join(dist,'theater.css'),'utf8');standalone=standalone.replace('<link rel="stylesheet" href="./theater.css">',()=>'<style>'+css+'</style>');
 await fs.mkdir(path.join(root,'release'),{recursive:true});
 for(const file of ['inmo_launch_event.html','inmo_3d_ar_optimized.html'])await fs.writeFile(path.join(root,'release',file),standalone);
-console.log('Built launch-event dist/ and standalone release files with local Three.js, venue and key puzzle.');
+console.log('Built first-person INMO comedy theater, local models, music and offline release.');

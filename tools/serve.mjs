@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../dist');
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.txt': 'text/plain' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.txt': 'text/plain', '.mp3':'audio/mpeg', '.jpg':'image/jpeg', '.png':'image/png', '.glb':'model/gltf-binary' };
 http.createServer(async (req, res) => {
   try {
     const file = path.resolve(root, '.' + decodeURIComponent((req.url || '/').split('?')[0]));
