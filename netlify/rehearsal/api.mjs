@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 
 const maxTeams = 500;
 const maxBodyBytes = 64 * 1024;
@@ -68,28 +68,6 @@ function digest(value) {
   return createHash('sha256').update(value).digest();
 }
 
-function equalSecret(actual, expected) {
-  return timingSafeEqual(digest(actual), digest(expected));
-}
-
-function codeDigest(value) {
-  if (value === '' || value === null || value === undefined) return null;
-  if (typeof value !== 'string' || !/^[!-~]{6,64}$/u.test(value)) {
-    reject(400, 'invalid_access_code', '访问码需为 6–64 个英文、数字或半角标点，且不能包含空格。');
-  }
-  const salt = randomBytes(16).toString('hex');
-  return `${salt}:${digest(salt + value).toString('hex')}`;
-}
-
-function verifyAccess(request, state) {
-  if (!state.accessDigest) return;
-  const [salt, expected] = state.accessDigest.split(':');
-  const code = request.headers.get('X-Rehearsal-Code') ?? '';
-  if (!/^[!-~]{6,64}$/u.test(code) || !equalSecret(digest(salt + code).toString('hex'), expected)) {
-    reject(401, 'access_code_required', '请输入负责人提供的访问码。');
-  }
-}
-
 function verifyAdmin(request, getAdminKey, adminKeyDigest) {
   const adminKey = getAdminKey();
   const expected = adminKey ? digest(adminKey) : adminKeyDigest;
@@ -126,7 +104,6 @@ function applyAdmin(state, body) {
       if (state.phase === 'registering') break;
       checkPhase(state, 'closed', '本轮抽号已锁定，无法重新开放报名。');
       addTeams(state, namesFrom(body.names));
-      state.accessDigest = codeDigest(body.code);
       state.phase = 'registering';
       break;
     case 'add':
@@ -156,8 +133,7 @@ function applyAdmin(state, body) {
   return adminState(state);
 }
 
-function applyPublic(state, request, body) {
-  verifyAccess(request, state);
+function applyPublic(state, body) {
   const input = teamName(body.name);
   let team = state.teams.find(({ key }) => key === input.key);
   if (body.action === 'register') {
@@ -202,9 +178,7 @@ export function createRehearsalHandler({ store, getAdminKey, adminKeyDigest = ''
   return async function handle(request) {
     try {
       if (request.method === 'GET') {
-        const state = await store.read();
-        verifyAccess(request, state);
-        return json(publicState(state));
+        return json(publicState(await store.read()));
       }
       if (request.method !== 'POST') {
         return json({ error: 'method_not_allowed', message: '不支持该请求方式。' }, 405, { Allow: 'GET, POST' });
@@ -217,7 +191,7 @@ export function createRehearsalHandler({ store, getAdminKey, adminKeyDigest = ''
         return json(await store.update((state) => applyAdmin(state, body)));
       }
       if (body.action === 'register' || body.action === 'draw') {
-        return json(await store.update((state) => applyPublic(state, request, body)));
+        return json(await store.update((state) => applyPublic(state, body)));
       }
       reject(400, 'unknown_action', '未识别该操作，请刷新页面后重试。');
     } catch (error) {

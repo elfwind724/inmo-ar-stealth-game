@@ -3,62 +3,36 @@ const byId = (id) => document.getElementById(id);
 const teamForm = byId('team-form');
 const teamName = byId('team-name');
 const teamSubmit = byId('team-submit');
-const accessForm = byId('access-form');
-const accessInput = byId('access-code');
-const accessSubmit = byId('access-submit');
 const refreshButton = byId('refresh');
 const authForm = byId('auth-form');
 const keyInput = byId('organizer-key');
 const adminControls = byId('admin-controls');
 const rosterForm = byId('admin-roster-form');
 const rosterInput = byId('roster-input');
-const openCodeInput = byId('admin-code');
 const startButton = byId('admin-start');
 const finishButton = byId('admin-finish');
 const exportButton = byId('admin-export');
 
 const phases = {
-  closed: ['等待开放', '报名尚未开放', '请等负责人开放报名，再填写小组名称。'],
-  registering: ['报名中', '填写小组名称', '报名后，等待负责人锁定名单并开放抽号。'],
-  drawing: ['抽号中', '抽取彩排号码', '输入报名时的小组名称。重复抽号会显示原号码。'],
-  finished: ['抽号结束', '彩排顺序已确定', '请在彩排顺序中查看你们小组的号码。'],
+  closed: ['尚未开始', '开放时间请等负责人通知。', '抽号'],
+  registering: ['报名中', '登记好小组后，等通知再来抽号。', '登记小组'],
+  drawing: ['可以抽号', '请输入报名时的小组名称。', '抽号'],
+  finished: ['抽号结束', '输入小组名称可查看原号码。', '查看号码'],
 };
 
 let state;
 let adminState;
 let organizer = false;
 let adminKey = '';
-let participantCode = readCode();
-let needsCode = false;
 let refreshing = false;
 let teamSubmitting = false;
 let adminSubmitting = false;
 let publicVersion = 0;
 let adminVersion = 0;
-const validAccessCode = /^[!-~]{6,64}$/;
-
-function readCode() {
-  try {
-    return sessionStorage.getItem('rehearsal-access') || '';
-  } catch {
-    return '';
-  }
-}
-
-function saveCode(code) {
-  try {
-    if (code) sessionStorage.setItem('rehearsal-access', code);
-    else sessionStorage.removeItem('rehearsal-access');
-  } catch {
-    // The current tab can still use the in-memory value.
-  }
-}
-
-async function request(data, { key = '', code = '' } = {}) {
+async function request(data, { key = '' } = {}) {
   const headers = { Accept: 'application/json' };
   if (data) headers['Content-Type'] = 'application/json';
   if (key) headers.Authorization = `Bearer ${key}`;
-  if (code) headers['X-Rehearsal-Code'] = code;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12000);
 
@@ -100,10 +74,9 @@ function clearTeamFeedback() {
   teamName.removeAttribute('aria-invalid');
 }
 
-function phaseLabel(key, label, title, detail) {
+function phaseLabel(key, label, detail) {
   byId('phase-badge').dataset.phase = key;
   byId('phase-label').textContent = label;
-  byId('action-title').textContent = title;
   byId('action-detail').textContent = detail;
 }
 
@@ -123,100 +96,58 @@ function groupRow(team) {
 }
 
 function renderPublic(nextState) {
+  if (state?.phase === nextState.phase && state.teamCount === nextState.teamCount && state.drawnCount === nextState.drawnCount) {
+    feedback('refresh-notice');
+    return;
+  }
   if (state?.phase !== nextState.phase) clearTeamFeedback();
   state = nextState;
-  needsCode = false;
-  accessForm.hidden = true;
-  phaseLabel(state.phase, ...phases[state.phase]);
-  const registering = state.phase === 'registering';
-  const drawing = state.phase === 'drawing';
-  teamForm.hidden = !(registering || drawing);
-  teamSubmit.textContent = registering ? '报名' : '抽号';
-  byId('order-summary').textContent = registering
-    ? `已报名 ${state.teamCount} 组`
-    : (drawing || state.phase === 'finished')
-      ? `已公布 ${state.drawnCount} / ${state.teamCount} 组`
-      : '抽出的号码会在这里公布。';
+  const [label, detail, button] = phases[state.phase];
+  phaseLabel(state.phase, label, detail);
+  teamSubmit.textContent = button;
+  const orderSummary = byId('order-summary');
+  orderSummary.hidden = state.phase === 'closed';
+  orderSummary.textContent = state.phase === 'registering'
+    ? `已登记 ${state.teamCount} 组`
+    : `已公布 ${state.drawnCount} / ${state.teamCount} 组`;
   const results = [...state.results].sort((a, b) => a.number - b.number);
   byId('results').replaceChildren(...results.map(groupRow));
   byId('results').hidden = results.length === 0;
   byId('empty-results').hidden = results.length > 0;
-  byId('empty-results').textContent = drawing ? '等候第一个小组抽号' : '彩排顺序将在抽号后更新';
+  byId('empty-results').textContent = state.phase === 'drawing' ? '还没有小组抽号。' : '抽号结果会显示在这里。';
   feedback('refresh-notice');
 }
 
-function requireCode(error, triedCode = false) {
-  state = undefined;
-  needsCode = true;
-  participantCode = '';
-  saveCode('');
-  phaseLabel('private', '需要口令', '输入活动口令', '请向活动负责人获取口令。');
-  accessForm.hidden = false;
-  teamForm.hidden = true;
-  byId('my-result').hidden = true;
-  byId('results').replaceChildren();
-  byId('results').hidden = true;
-  byId('empty-results').hidden = false;
-  byId('empty-results').textContent = '输入活动口令后查看名单';
-  byId('order-summary').textContent = '仅供参加彩排的小组查看。';
-  feedback('team-error', triedCode ? error.message : '');
-  feedback('team-message');
-  feedback('refresh-notice');
-}
-
-async function refreshPublic({ code = participantCode, manual = false } = {}) {
+async function refreshPublic({ manual = false } = {}) {
   if (refreshing || teamSubmitting || organizer) return;
   const version = ++publicVersion;
   refreshing = true;
   refreshButton.disabled = true;
   try {
-    const result = await request(null, { code });
+    const result = await request();
     if (version !== publicVersion || organizer) return;
-    participantCode = code;
-    saveCode(code);
-    accessInput.value = '';
     renderPublic(result);
     if (manual) feedback('refresh-notice', '已更新。');
   } catch (error) {
     if (version !== publicVersion || organizer) return;
-    if (error.code === 'access_code_required') {
-      requireCode(error, Boolean(code));
-    } else {
-      if (!state && !needsCode) {
-        phaseLabel('offline', '无法连接', '暂时无法获取活动状态', '请点击「刷新」重试。');
-        byId('empty-results').textContent = '暂时无法加载彩排顺序';
-      }
-      feedback('refresh-notice', error.message);
+    if (!state) {
+      phaseLabel('offline', '连接失败', '请检查网络，再点「刷新」。');
+      byId('empty-results').textContent = '暂时无法加载彩排顺序。';
     }
+    feedback('refresh-notice', error.message);
   } finally {
     refreshing = false;
     refreshButton.disabled = false;
   }
 }
 
-accessForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const code = accessInput.value.trim();
-  if (!validAccessCode.test(code)) {
-    feedback('team-error', code ? '请检查活动口令中的字母、数字或半角符号。' : '请输入活动口令。');
-    accessInput.focus();
-    return;
-  }
-  accessSubmit.disabled = true;
-  await refreshPublic({ code });
-  if (needsCode) accessInput.focus();
-  else if (!teamForm.hidden) teamName.focus();
-  accessSubmit.disabled = false;
-});
-
 teamForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (teamSubmitting || !state || teamForm.hidden) return;
+  if (teamSubmitting || organizer) return;
   clearTeamFeedback();
   const name = teamName.value.trim();
-  const action = state.phase === 'registering' ? 'register' : 'draw';
   if (!name) {
-    feedback('team-error', action === 'draw' ? '还没输入小组名称，请输入后再点击抽号。' : '还没输入小组名称，请输入后再点击报名。');
+    feedback('team-error', '还没输入小组名称，请先填写。');
     teamName.setAttribute('aria-invalid', 'true');
     teamName.focus();
     return;
@@ -226,15 +157,26 @@ teamForm.addEventListener('submit', async (event) => {
   teamSubmitting = true;
   teamSubmit.disabled = true;
   teamName.readOnly = true;
-  teamSubmit.textContent = action === 'register' ? '正在报名…' : '正在抽号…';
+  teamSubmit.textContent = '请稍候…';
   byId('my-result').hidden = true;
   try {
-    const result = await request({ action, name }, { code: participantCode });
+    if (!state || state.phase === 'closed') {
+      const latest = await request();
+      if (version !== publicVersion || organizer) return;
+      renderPublic(latest);
+    }
+    if (state.phase === 'closed') {
+      feedback('team-message', '抽号还没开始，请等负责人通知。');
+      return;
+    }
+    const action = state.phase === 'registering' ? 'register' : 'draw';
+    teamSubmit.textContent = action === 'register' ? '正在登记…' : '正在抽号…';
+    const result = await request({ action, name });
     if (version !== publicVersion || organizer) return;
     renderPublic(result.state);
     teamName.value = result.team.name;
     if (result.team.number == null) {
-      feedback('team-message', `「${result.team.name}」已报名，请留意抽号开放时间。`);
+      feedback('team-message', `「${result.team.name}」已登记，开放后就可以抽号。`);
     } else {
       byId('my-team').textContent = result.team.name;
       byId('my-number').textContent = result.team.number;
@@ -242,26 +184,22 @@ teamForm.addEventListener('submit', async (event) => {
     }
   } catch (error) {
     if (version !== publicVersion || organizer) return;
-    if (error.code === 'access_code_required') {
-      requireCode(error, Boolean(participantCode));
-    } else {
-      feedback('team-error', error.message);
-      if (error.status === 409) {
-        try {
-          const updated = await request(null, { code: participantCode });
-          if (version !== publicVersion || organizer) return;
-          renderPublic(updated);
-          feedback('team-error', error.message);
-        } catch {
-          // Keep the original explanation available if the refresh also fails.
-        }
+    feedback('team-error', error.message);
+    if (error.status === 409) {
+      try {
+        const updated = await request();
+        if (version !== publicVersion || organizer) return;
+        renderPublic(updated);
+        feedback('team-error', error.message);
+      } catch {
+        // Keep the original explanation if refreshing also fails.
       }
     }
   } finally {
     teamSubmitting = false;
     teamSubmit.disabled = false;
     teamName.readOnly = false;
-    teamSubmit.textContent = state?.phase === 'registering' ? '报名' : '抽号';
+    teamSubmit.textContent = phases[state?.phase]?.[2] ?? '抽号';
   }
 });
 
@@ -270,10 +208,7 @@ teamName.addEventListener('input', () => {
   byId('my-result').hidden = true;
 });
 
-refreshButton.addEventListener('click', () => {
-  if (needsCode) accessInput.focus();
-  else void refreshPublic({ manual: true });
-});
+refreshButton.addEventListener('click', () => void refreshPublic({ manual: true }));
 
 function renderAdmin(payload) {
   adminState = payload;
@@ -289,7 +224,6 @@ function renderAdmin(payload) {
   byId('roster-input').labels[0].textContent = closed ? '小组名单（选填）' : '补充小组名单';
   byId('roster-help').textContent = closed ? '一行一个名字。也可以留空，让各组自行报名。' : '每行填写一个要增加的小组名称。';
   byId('admin-roster-submit').textContent = closed ? '开放报名' : '添加小组';
-  byId('admin-code-row').hidden = !closed;
   startButton.hidden = !registering;
   startButton.disabled = teams.length === 0;
   finishButton.hidden = !drawing;
@@ -324,7 +258,6 @@ function logout() {
   adminState = undefined;
   keyInput.value = '';
   rosterInput.value = '';
-  openCodeInput.value = '';
   authForm.hidden = false;
   adminControls.hidden = true;
   byId('admin-list').hidden = true;
@@ -378,21 +311,14 @@ rosterForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const opening = adminState?.state.phase === 'closed';
   const names = rosterInput.value;
-  const code = openCodeInput.value.trim();
   if (!opening && !names.trim()) {
     feedback('admin-error', '请输入要添加的小组名称。');
     rosterInput.focus();
     return;
   }
-  if (opening && code && !validAccessCode.test(code)) {
-    feedback('admin-error', '活动口令须为 6 至 64 个英文字母、数字或半角符号。');
-    openCodeInput.focus();
-    return;
-  }
-  const data = opening ? { action: 'open', names, code } : { action: 'add', names };
+  const data = { action: opening ? 'open' : 'add', names };
   if (await adminAction(data, opening ? '报名已开放。' : '名单已更新。')) {
     rosterInput.value = '';
-    openCodeInput.value = '';
   }
 });
 
@@ -441,16 +367,16 @@ function route() {
   link.textContent = organizer ? '返回彩排抽号' : '负责人入口';
   if (!organizer) {
     logout();
-    if (!needsCode) void refreshPublic();
+    void refreshPublic();
   }
 }
 
 window.addEventListener('hashchange', route);
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && !needsCode) void refreshPublic();
+  if (document.visibilityState === 'visible') void refreshPublic();
 });
 setInterval(() => {
-  if (document.visibilityState === 'visible' && !needsCode) void refreshPublic();
+  if (document.visibilityState === 'visible') void refreshPublic();
 }, 15000);
 
 route();

@@ -10,11 +10,10 @@ const testDatabase = process.env.REHEARSAL_TEST_DATABASE_URL;
 const adminKey = randomBytes(24).toString('hex');
 const migration = new URL('../netlify/database/migrations/20261117000100_create_rehearsal.sql', import.meta.url);
 
-async function call(handler, action, fields = {}, { bearer, code, expectedStatus = 200 } = {}) {
+async function call(handler, action, fields = {}, { bearer, expectedStatus = 200 } = {}) {
   const headers = {};
   if (action) headers['content-type'] = 'application/json';
   if (bearer) headers.authorization = `Bearer ${bearer}`;
-  if (code) headers['x-rehearsal-code'] = code;
   const request = new Request(endpoint, action ? {
     method: 'POST', headers, body: JSON.stringify({ action, ...fields }),
   } : { headers });
@@ -58,18 +57,16 @@ test('rehearsal API and real PostgreSQL preserve the roster and a unique random 
   await pool.query(await readFile(migration, 'utf8'));
 
   const handler = createRehearsalHandler({ store: createPostgresStore(() => pool), getAdminKey: () => adminKey });
-  let groupCode;
-  const publicCall = (action, name, expectedStatus = 200) => call(handler, action, { name }, { code: groupCode, expectedStatus });
+  const publicCall = (action, name, expectedStatus = 200) => call(handler, action, { name }, { expectedStatus });
   const admin = (action, fields, expectedStatus = 200) => call(handler, action, fields, { bearer: adminKey, expectedStatus });
   assert.deepEqual(await publicCall(), { phase: 'closed', teamCount: 0, drawnCount: 0, results: [] });
   await publicCall('register', '公益小组', 409);
   await admin('start', {}, 409);
-  await admin('open', { code: 'short' }, 400);
-  assert.equal((await publicCall()).phase, 'closed');
-  groupCode = randomBytes(8).toString('hex');
-  assert.equal((await admin('open', { code: groupCode })).state.phase, 'registering');
-  await call(handler, undefined, {}, { expectedStatus: 401 });
-  await call(handler, 'register', { name: '无有效访问码' }, { code: 'wrong-code', expectedStatus: 401 });
+  assert.equal((await admin('open')).state.phase, 'registering');
+  // An event opened by the prior release can still have a saved activity code.
+  const legacyDigest = `${'a'.repeat(32)}:${'b'.repeat(64)}`;
+  await pool.query('UPDATE christmas_rehearsal_event SET access_digest = $1 WHERE singleton', [legacyDigest]);
+  assert.equal((await publicCall()).phase, 'registering');
   await admin('start', {}, 409);
   await publicCall('register', '\u3000  ', 400);
   await publicCall('register', 42, 400);

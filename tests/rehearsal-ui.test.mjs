@@ -14,8 +14,8 @@ function openPage(t, hash, handler) {
   const dom = new JSDOM(html, { url: new URL(hash, url), runScripts: 'outside-only' });
   const { window } = dom;
   const requests = [];
-  window.fetch = (path, options) => {
-    requests.push(options.body ? JSON.parse(options.body) : null);
+  window.fetch = (path, options = {}) => {
+    requests.push({ body: options.body ? JSON.parse(options.body) : null, headers: new Headers(options.headers) });
     return handler(new Request(new URL(path, url), options));
   };
   window.confirm = () => true;
@@ -43,10 +43,9 @@ async function until(check, message) {
   assert.fail(message);
 }
 
-test('organizer and separate participant pages complete a protected rehearsal lottery', async (t) => {
-  const accessCode = randomBytes(8).toString('hex');
+test('organizer and separate participant pages complete a rehearsal lottery without public codes', async (t) => {
   const key = randomBytes(24).toString('hex');
-  let event = { phase: 'closed', teams: [], accessDigest: null };
+  let event = { phase: 'closed', teams: [] };
   const handler = createRehearsalHandler({
     getAdminKey: () => key,
     store: {
@@ -62,64 +61,72 @@ test('organizer and separate participant pages complete a protected rehearsal lo
   const organizer = openPage(t, '#organizer', handler);
   assert.ok(organizer.visible('organizer'));
   assert.equal(organizer.visible('participants'), false);
-  const participant = openPage(t, '', handler);
-  await until(() => participant.text('phase-label') === '等待开放', 'Closed state is shown');
+  const registrant = openPage(t, '', handler);
+  await until(() => registrant.text('phase-label') === '尚未开始', 'The participant page loads without signing in');
+  assert.ok(registrant.visible('team-form'));
+  assert.equal(registrant.node('participants').querySelectorAll('input[type="password"]').length, 0);
+  registrant.input('team-name', '尚未开放的小组');
+  registrant.click('team-submit');
+  await until(() => registrant.text('team-message').includes('抽号还没开始'), 'The page explains when drawing has not opened');
+  assert.ok(registrant.requests.every(({ body }) => body === null));
 
   organizer.input('organizer-key', key);
   organizer.submit('auth-form');
   await until(() => organizer.visible('admin-controls'), 'Organizer can sign in');
   assert.equal(organizer.window.sessionStorage.length, 0);
+  assert.equal(organizer.node('admin-roster-form').querySelectorAll('input[type="password"]').length, 0);
   organizer.input('roster-input', '测试演唱组');
-  organizer.input('admin-code', accessCode);
   organizer.submit('admin-roster-form');
   await until(() => organizer.text('roster-summary') === '共 1 组', 'Opening registration imports the pre-entered team');
 
-  participant.click('refresh');
-  await until(() => participant.visible('access-form'), 'A separate browser must provide the access code');
-  participant.input('access-code', 'wrong-code');
-  participant.submit('access-form');
-  await until(() => participant.visible('team-error'), 'Wrong access code triggers feedback');
-  participant.input('access-code', accessCode);
-  participant.submit('access-form');
-  await until(() => participant.visible('team-form'), 'Valid access code permits registration');
-  participant.input('team-name', '  测试音响组  ');
-  participant.submit('team-form');
-  await until(() => participant.visible('team-message'), 'Participant registers a new team');
-  assert.equal(participant.node('team-name').value, '测试音响组');
+  registrant.click('refresh');
+  await until(() => /报名|登记/.test(registrant.text('team-submit')), 'A separate browser can register directly');
+  registrant.input('team-name', '  测试音响组  ');
+  registrant.click('team-submit');
+  await until(() => registrant.visible('team-message'), 'Participant registers a new team');
+  assert.equal(registrant.node('team-name').value, '测试音响组');
 
   organizer.click('admin-refresh');
   await until(() => organizer.text('roster-summary') === '共 2 组', 'Organizer sees the cross-browser registration');
   organizer.click('admin-start');
   await until(() => organizer.visible('admin-finish'), 'Organizer locks and opens the draw');
-  participant.click('refresh');
-  await until(() => participant.text('team-submit') === '抽号', 'Participant sees the draw button');
+  const participant = openPage(t, '', handler);
+  await until(() => participant.node('phase-badge').dataset.phase === 'drawing', 'A fresh page can draw directly');
+  assert.ok(participant.visible('team-form'));
+  assert.equal(participant.text('team-submit'), '抽号');
+  assert.equal(participant.node('participants').querySelectorAll('input[type="password"]').length, 0);
   assert.equal(participant.visible('results'), false);
 
   participant.input('team-name', '　 ');
   const count = participant.requests.length;
-  participant.submit('team-form');
+  participant.click('team-submit');
   assert.equal(participant.requests.length, count);
-  assert.match(participant.text('team-error'), /还没输入小组名称.*抽号/);
+  assert.match(participant.text('team-error'), /还没输入小组名称/);
   assert.equal(participant.window.document.activeElement.id, 'team-name');
   assert.equal(participant.node('team-name').getAttribute('aria-invalid'), 'true');
 
   participant.input('team-name', '测试音响组');
-  participant.submit('team-form');
+  participant.click('team-submit');
   await until(() => participant.visible('my-result'), 'Participant receives their number');
   const slot = participant.text('my-number');
   assert.match(slot, /^[12]$/);
   assert.equal(participant.text('my-team'), '测试音响组');
   assert.equal(participant.node('results').children.length, 1);
-  participant.submit('team-form');
-  await until(() => participant.visible('my-result'), 'A repeated draw returns the same result');
+  const draws = participant.requests.filter(({ body }) => body?.action === 'draw').length;
+  participant.click('team-submit');
+  await until(() => participant.requests.filter(({ body }) => body?.action === 'draw').length === draws + 1 && !participant.node('team-submit').disabled, 'A repeated draw returns the same result');
   assert.equal(participant.text('my-number'), slot);
 
   organizer.click('admin-finish');
   await until(() => organizer.visible('admin-export'), 'Finishing enables download');
   participant.click('refresh');
   await until(() => participant.node('results').children.length === 2, 'Both groups appear on the public page in draw order');
-  assert.deepEqual(Array.from(participant.node('results').children, (item) => item.firstElementChild.textContent), ['1 号', '2 号']);
-  assert.equal(participant.text('phase-label'), '抽号结束');
+  assert.deepEqual(Array.from(participant.node('results').children, (item) => item.firstElementChild.textContent.replace(/\s|号/g, '')), ['1', '2']);
+  assert.equal(participant.text('team-submit'), '查看号码');
+  for (const { headers } of [...registrant.requests, ...participant.requests]) {
+    assert.equal(headers.has('Authorization'), false);
+    assert.equal(headers.has('X-Rehearsal-Code'), false);
+  }
   organizer.click('admin-logout');
   assert.equal(organizer.node('roster').children.length, 0);
   assert.ok(organizer.visible('auth-form'));
