@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#123b30">
   <title>2026 圣诞彩排抽号</title>
   <link rel="stylesheet" href="/rehearsal/style.css">
+  <link rel="stylesheet" href="/rehearsal/draw-motion.css">
   <script type="module" src="/rehearsal/app.js"></script>
 </head>
 <body>
@@ -32,9 +33,10 @@
           <p id="team-error" class="notice error" role="alert" hidden></p>
         </form>
         <p id="team-message" class="notice" role="status" hidden></p>
-        <div id="my-result" class="my-result" role="status" hidden>
-          <div><p class="result-caption">你的小组顺序</p><p id="my-team"></p></div>
-          <p class="slot"><strong id="my-number"></strong><span>号</span></p>
+        <div id="draw-stage" hidden>
+          <p id="draw-caption"></p>
+          <p class="draw-display"><strong id="draw-number"></strong><span>号</span></p>
+          <p id="draw-team"></p>
         </div>
       </section>
 
@@ -69,8 +71,7 @@
             <button id="admin-roster-submit" class="button primary" type="submit">开放报名</button>
           </form>
           <div class="admin-buttons">
-            <button id="admin-start" class="button primary" type="button" hidden>锁定名单并开放抽号</button>
-            <button id="admin-finish" class="button secondary" type="button" hidden>公布剩余号码并结束</button>
+            <button id="admin-start" class="button primary" type="button" hidden>开放 1–13 号抽签</button>
             <button id="admin-export" class="button secondary" type="button" hidden>下载彩排名单</button>
             <button id="admin-logout" class="button secondary" type="button">退出管理</button>
           </div>
@@ -82,13 +83,13 @@
       <section id="admin-list" class="card order-card" aria-labelledby="roster-title" hidden>
         <div class="card-heading">
           <div>
-            <h2 id="roster-title">报名名单</h2>
+            <h2 id="roster-title">小组与号码</h2>
             <p id="roster-summary" class="muted"></p>
           </div>
           <button id="admin-refresh" class="button secondary compact" type="button">刷新</button>
         </div>
-        <ul id="roster" class="results" aria-label="报名名单" hidden></ul>
-        <p id="empty-roster" class="empty">还没有小组报名。</p>
+        <ul id="roster" class="results" aria-label="小组和号码" hidden></ul>
+        <p id="empty-roster" class="empty">还没有小组记录。</p>
       </section>
     </main>
 

@@ -1,8 +1,12 @@
+import { createDrawMotion } from './draw-motion.js';
+
 const endpoint = '/rehearsal/api';
 const byId = (id) => document.getElementById(id);
 const teamForm = byId('team-form');
 const teamName = byId('team-name');
 const teamSubmit = byId('team-submit');
+const drawStage = byId('draw-stage');
+const drawMotion = createDrawMotion(drawStage);
 const refreshButton = byId('refresh');
 const authForm = byId('auth-form');
 const keyInput = byId('organizer-key');
@@ -10,13 +14,12 @@ const adminControls = byId('admin-controls');
 const rosterForm = byId('admin-roster-form');
 const rosterInput = byId('roster-input');
 const startButton = byId('admin-start');
-const finishButton = byId('admin-finish');
 const exportButton = byId('admin-export');
 
 const phases = {
   closed: ['尚未开始', '开放时间请等负责人通知。', '抽号'],
   registering: ['报名中', '登记好小组后，等通知再来抽号。', '登记小组'],
-  drawing: ['可以抽号', '请输入报名时的小组名称。', '抽号'],
+  drawing: ['可以抽号', '填好小组名称，抽取 1–13 号。', '抽号'],
   finished: ['抽号结束', '输入小组名称可查看原号码。', '查看号码'],
 };
 
@@ -29,6 +32,7 @@ let teamSubmitting = false;
 let adminSubmitting = false;
 let publicVersion = 0;
 let adminVersion = 0;
+let displayedDraw;
 async function request(data, { key = '' } = {}) {
   const headers = { Accept: 'application/json' };
   if (data) headers['Content-Type'] = 'application/json';
@@ -74,6 +78,11 @@ function clearTeamFeedback() {
   teamName.removeAttribute('aria-invalid');
 }
 
+function clearDraw() {
+  displayedDraw = undefined;
+  drawMotion.clear();
+}
+
 function phaseLabel(key, label, detail) {
   byId('phase-badge').dataset.phase = key;
   byId('phase-label').textContent = label;
@@ -96,7 +105,11 @@ function groupRow(team) {
 }
 
 function renderPublic(nextState) {
-  if (state?.phase === nextState.phase && state.teamCount === nextState.teamCount && state.drawnCount === nextState.drawnCount) {
+  if (state?.phase === nextState.phase
+      && state.teamCount === nextState.teamCount
+      && state.remainingCount === nextState.remainingCount
+      && state.results.length === nextState.results.length
+      && state.results.every((team, index) => team.name === nextState.results[index].name && team.number === nextState.results[index].number)) {
     feedback('refresh-notice');
     return;
   }
@@ -109,12 +122,16 @@ function renderPublic(nextState) {
   orderSummary.hidden = state.phase === 'closed';
   orderSummary.textContent = state.phase === 'registering'
     ? `已登记 ${state.teamCount} 组`
-    : `已公布 ${state.drawnCount} / ${state.teamCount} 组`;
+    : `已抽 ${state.drawnCount} / ${state.numberLimit} · 剩 ${state.remainingCount} 个号码`;
   const results = [...state.results].sort((a, b) => a.number - b.number);
   byId('results').replaceChildren(...results.map(groupRow));
   byId('results').hidden = results.length === 0;
   byId('empty-results').hidden = results.length > 0;
   byId('empty-results').textContent = state.phase === 'drawing' ? '还没有小组抽号。' : '抽号结果会显示在这里。';
+  if (displayedDraw && !results.some((team) => team.name === displayedDraw.name && team.number === displayedDraw.number)) {
+    clearDraw();
+    feedback('team-message', '这个号码已撤回，请核对小组名称后再抽。');
+  }
   feedback('refresh-notice');
 }
 
@@ -158,7 +175,7 @@ teamForm.addEventListener('submit', async (event) => {
   teamSubmit.disabled = true;
   teamName.readOnly = true;
   teamSubmit.textContent = '请稍候…';
-  byId('my-result').hidden = true;
+  clearDraw();
   try {
     if (!state || state.phase === 'closed') {
       const latest = await request();
@@ -170,20 +187,29 @@ teamForm.addEventListener('submit', async (event) => {
       return;
     }
     const action = state.phase === 'registering' ? 'register' : 'draw';
-    teamSubmit.textContent = action === 'register' ? '正在登记…' : '正在抽号…';
+    const isLookup = state.phase === 'finished';
+    teamSubmit.textContent = action === 'register' ? '正在登记…' : isLookup ? '正在查询…' : '正在抽号…';
+    if (action === 'draw' && !isLookup) {
+      teamName.blur();
+      drawMotion.spin();
+      drawStage.scrollIntoView?.({ block: 'nearest' });
+    }
     const result = await request({ action, name });
     if (version !== publicVersion || organizer) return;
-    renderPublic(result.state);
     teamName.value = result.team.name;
     if (result.team.number == null) {
-      feedback('team-message', `「${result.team.name}」已登记，开放后就可以抽号。`);
+      renderPublic(result.state);
+      feedback('team-message', result.state.phase === 'drawing'
+        ? '现在可以抽号，请点「抽号」。'
+        : `「${result.team.name}」已登记，开放后就可以抽号。`);
     } else {
-      byId('my-team').textContent = result.team.name;
-      byId('my-number').textContent = result.team.number;
-      byId('my-result').hidden = false;
+      if (!await drawMotion.reveal(result.team.number, result.team.name) || version !== publicVersion || organizer) return;
+      displayedDraw = result.team;
+      renderPublic(result.state);
     }
   } catch (error) {
     if (version !== publicVersion || organizer) return;
+    clearDraw();
     feedback('team-error', error.message);
     if (error.status === 409) {
       try {
@@ -205,7 +231,7 @@ teamForm.addEventListener('submit', async (event) => {
 
 teamName.addEventListener('input', () => {
   clearTeamFeedback();
-  byId('my-result').hidden = true;
+  clearDraw();
 });
 
 refreshButton.addEventListener('click', () => void refreshPublic({ manual: true }));
@@ -215,7 +241,7 @@ function renderAdmin(payload) {
   const { state: event, teams } = payload;
   const registering = event.phase === 'registering';
   const closed = event.phase === 'closed';
-  const drawing = event.phase === 'drawing';
+  const canResume = event.phase === 'finished' && event.remainingCount > 0;
   authForm.hidden = true;
   adminControls.hidden = false;
   byId('admin-list').hidden = false;
@@ -224,28 +250,28 @@ function renderAdmin(payload) {
   byId('roster-input').labels[0].textContent = closed ? '小组名单（选填）' : '补充小组名单';
   byId('roster-help').textContent = closed ? '一行一个名字。也可以留空，让各组自行报名。' : '每行填写一个要增加的小组名称。';
   byId('admin-roster-submit').textContent = closed ? '开放报名' : '添加小组';
-  startButton.hidden = !registering;
-  startButton.disabled = teams.length === 0;
-  finishButton.hidden = !drawing;
+  startButton.hidden = !(closed || registering || canResume);
+  startButton.textContent = canResume ? '重新开放剩余号码' : '开放抽号（1–13 号）';
   exportButton.hidden = event.results.length === 0;
   const roster = byId('roster');
-  byId('roster-summary').textContent = `共 ${event.teamCount} 组${drawing || event.phase === 'finished' ? `，已公布 ${event.drawnCount} 组` : ''}`;
+  byId('roster-summary').textContent = `登记 ${event.teamCount} 组 · 已抽 ${event.drawnCount} / ${event.numberLimit}`;
   const sorted = [...teams].sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity));
   roster.replaceChildren(...sorted.map((team) => {
     const row = groupRow(team);
-    if (registering) {
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'button secondary compact';
-      remove.textContent = '移除';
-      remove.setAttribute('aria-label', `移除 ${team.name}`);
-      remove.addEventListener('click', () => {
-        if (window.confirm(`从报名名单移除「${team.name}」？`)) {
-          void adminAction({ action: 'remove', name: team.name }, '已移除。');
-        }
-      });
-      row.append(remove);
-    }
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'button secondary compact remove-team';
+    remove.textContent = '删除';
+    remove.setAttribute('aria-label', `删除 ${team.name}`);
+    remove.addEventListener('click', () => {
+      const hasNumber = team.number !== null;
+      const note = hasNumber ? `${team.number} 号会退回，可由其他小组抽取。` : '';
+      if (window.confirm(`删除「${team.name}」？${note}`)) {
+        const success = hasNumber ? `已删除「${team.name}」，${team.number} 号已退回。` : `已删除「${team.name}」。`;
+        void adminAction({ action: 'remove', name: team.name, expectedNumber: team.number }, success);
+      }
+    });
+    row.append(remove);
     return row;
   }));
   roster.hidden = teams.length === 0;
@@ -323,14 +349,8 @@ rosterForm.addEventListener('submit', async (event) => {
 });
 
 startButton.addEventListener('click', () => {
-  if (window.confirm(`当前 ${adminState.state.teamCount} 组。锁定后名单无法更改，确定开放抽号？`)) {
-    void adminAction({ action: 'start' }, '名单已锁定，各组可以开始抽号。');
-  }
-});
-
-finishButton.addEventListener('click', () => {
-  if (window.confirm('公布尚未抽出的号码，结束本场抽号？')) {
-    void adminAction({ action: 'finish' }, '号码已全部公布。');
+  if (window.confirm('现在开放抽号？各组填写自己的小组名称后即可抽取 1–13 号。')) {
+    void adminAction({ action: 'start' }, '抽号已开放，各组可以开始抽号。');
   }
 });
 
@@ -365,7 +385,10 @@ function route() {
   const link = byId('view-link');
   link.href = organizer ? '#participants' : '#organizer';
   link.textContent = organizer ? '返回彩排抽号' : '负责人入口';
-  if (!organizer) {
+  if (organizer) {
+    ++publicVersion;
+    clearDraw();
+  } else {
     logout();
     void refreshPublic();
   }

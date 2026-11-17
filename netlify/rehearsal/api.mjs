@@ -1,6 +1,7 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 
-const maxTeams = 500;
+const numberLimit = 13;
+const drawNumbers = Array.from({ length: numberLimit }, (_, index) => index + 1);
 const maxBodyBytes = 64 * 1024;
 const adminActions = new Set(['adminState', 'open', 'add', 'remove', 'start', 'finish']);
 const nameOrder = new Intl.Collator('zh-CN');
@@ -37,8 +38,8 @@ function teamName(value) {
 
 function namesFrom(value) {
   const values = typeof value === 'string' ? value.split(/\r\n|\n|\r/u).filter((name) => name.trim()) : value ?? [];
-  if (!Array.isArray(values) || values.length > maxTeams) {
-    reject(400, 'invalid_names', `请每行输入一个小组名称，名单最多容纳 ${maxTeams} 组。`);
+  if (!Array.isArray(values) || values.length > numberLimit) {
+    reject(400, 'invalid_names', `请每行输入一个小组名称，名单最多容纳 ${numberLimit} 组。`);
   }
   return values.map(teamName);
 }
@@ -47,12 +48,22 @@ function teamResult(team) {
   return { name: team.name, number: team.revealed ? team.number : null };
 }
 
+function isDrawNumber(number) {
+  return Number.isInteger(number) && number >= 1 && number <= numberLimit;
+}
+
+function remainingNumbers(teams) {
+  return numberLimit - teams.filter((team) => team.revealed && isDrawNumber(team.number)).length;
+}
+
 function publicState(state) {
   const results = state.teams.filter((team) => team.revealed).map(teamResult).sort((a, b) => a.number - b.number);
   return {
     phase: state.phase,
     teamCount: state.teams.length,
     drawnCount: results.length,
+    numberLimit,
+    remainingCount: remainingNumbers(state.teams),
     results,
   };
 }
@@ -85,17 +96,32 @@ function addTeams(state, teams) {
   for (const team of teams) {
     if (!current.has(team.key)) current.set(team.key, team);
   }
-  if (current.size > maxTeams) reject(409, 'roster_full', `名单已达到 ${maxTeams} 组上限。`);
+  if (current.size > numberLimit) reject(409, 'roster_full', `名单已达到 ${numberLimit} 组上限。`);
   state.teams = [...current.values()];
 }
 
-function assignNumbers(teams) {
-  const shuffled = teams.slice();
-  for (let i = shuffled.length - 1; i > 0; i -= 1) {
-    const j = randomInt(i + 1);
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+function claimNumber(state, team) {
+  // Earlier rounds could reserve an unpublished number for a registered group.
+  if (!isDrawNumber(team.number)) {
+    const assigned = new Set(state.teams.map(({ number }) => number));
+    const available = drawNumbers.filter((number) => !assigned.has(number));
+    if (!available.length) reject(409, 'pool_full', '13 个彩排号码已分配，请联系负责人。');
+    team.number = available[randomInt(available.length)];
   }
-  shuffled.forEach((team, index) => { team.number = index + 1; });
+  team.revealed = true;
+  if (remainingNumbers(state.teams) === 0) state.phase = 'finished';
+}
+
+function removeTeam(state, body) {
+  const { key } = teamName(body.name);
+  const index = state.teams.findIndex((team) => team.key === key);
+  if (index < 0) return;
+  const team = state.teams[index];
+  if (Object.hasOwn(body, 'expectedNumber') && body.expectedNumber !== teamResult(team).number) {
+    reject(409, 'stale_team', '这个小组的号码有变动，请刷新名单后再删除。');
+  }
+  state.teams.splice(index, 1);
+  if (state.phase === 'finished' && remainingNumbers(state.teams) > 0) state.phase = 'drawing';
 }
 
 function applyAdmin(state, body) {
@@ -110,23 +136,16 @@ function applyAdmin(state, body) {
       checkPhase(state, 'registering', '只能在报名阶段补录小组。');
       addTeams(state, namesFrom(body.names));
       break;
-    case 'remove': {
-      checkPhase(state, 'registering', '名单已锁定，无法移除小组。');
-      const { key } = teamName(body.name);
-      state.teams = state.teams.filter((team) => team.key !== key);
+    case 'remove':
+      removeTeam(state, body);
       break;
-    }
     case 'start':
-      if (state.phase === 'drawing' || state.phase === 'finished') break;
-      checkPhase(state, 'registering', '请先开放报名。');
-      if (!state.teams.length) reject(409, 'no_teams', '请至少录入一个小组再开始抽号。');
-      assignNumbers(state.teams);
-      state.phase = 'drawing';
+      if (remainingNumbers(state.teams) > 0) state.phase = 'drawing';
       break;
     case 'finish':
       if (state.phase === 'finished') break;
-      checkPhase(state, 'drawing', '请先锁定名单并开始抽号。');
-      for (const team of state.teams) team.revealed = true;
+      checkPhase(state, 'drawing', '请先开放抽号。');
+      if (remainingNumbers(state.teams) > 0) reject(409, 'draw_incomplete', '13 个号码还没有全部抽完。');
       state.phase = 'finished';
       break;
   }
@@ -142,13 +161,18 @@ function applyPublic(state, body) {
       addTeams(state, [input]);
       team = input;
     }
-  } else {
-    if (state.phase !== 'drawing' && state.phase !== 'finished') {
-      reject(409, 'wrong_phase', '负责人锁定名单后才能抽号。');
+  } else if (!team?.revealed) {
+    if (state.phase === 'finished') {
+      if (remainingNumbers(state.teams) === 0) reject(409, 'pool_full', '13 个彩排号码已分配，请联系负责人。');
+      reject(409, 'wrong_phase', '抽号已结束，请联系负责人。');
     }
-    if (!team) reject(404, 'unknown_team', '名单里没有这个小组，请核对报名时填写的名称。');
-    team.revealed = true;
-    if (state.teams.every((entry) => entry.revealed)) state.phase = 'finished';
+    checkPhase(state, 'drawing', '负责人开放抽号后才能参加。');
+    if (!team) {
+      if (state.teams.length >= numberLimit) reject(409, 'roster_full', '已有 13 个小组登记，请让负责人核对名单。');
+      state.teams.push(input);
+      team = input;
+    }
+    claimNumber(state, team);
   }
   return { team: teamResult(team), state: publicState(state) };
 }

@@ -35,9 +35,11 @@ test('the rehearsal API rejects missing or wrong organizer credentials without u
   }
 });
 
-test('rehearsal API and real PostgreSQL preserve the roster and a unique random draw under concurrent requests', {
+const requiresPostgres = {
   skip: !testDatabase && 'Set REHEARSAL_TEST_DATABASE_URL to a local PostgreSQL database to run this integration test.',
-}, async (t) => {
+};
+
+async function setupPostgres(t) {
   const url = new URL(testDatabase);
   assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(url.hostname), 'Use a disposable local database.');
   assert.equal(url.searchParams.has('host'), false);
@@ -59,15 +61,16 @@ test('rehearsal API and real PostgreSQL preserve the roster and a unique random 
   const handler = createRehearsalHandler({ store: createPostgresStore(() => pool), getAdminKey: () => adminKey });
   const publicCall = (action, name, expectedStatus = 200) => call(handler, action, { name }, { expectedStatus });
   const admin = (action, fields, expectedStatus = 200) => call(handler, action, fields, { bearer: adminKey, expectedStatus });
-  assert.deepEqual(await publicCall(), { phase: 'closed', teamCount: 0, drawnCount: 0, results: [] });
-  await publicCall('register', '公益小组', 409);
-  await admin('start', {}, 409);
+  return { pool, publicCall, admin };
+}
+
+test('a concurrent rehearsal draw uses 1–13 once each and returns deleted awards to the pool', requiresPostgres, async (t) => {
+  const { pool, publicCall, admin } = await setupPostgres(t);
+  assert.deepEqual(await publicCall(), {
+    phase: 'closed', teamCount: 0, drawnCount: 0, numberLimit: 13, remainingCount: 13, results: [],
+  });
+  assert.equal((await publicCall('draw', '公益小组', 409)).error, 'wrong_phase');
   assert.equal((await admin('open')).state.phase, 'registering');
-  // An event opened by the prior release can still have a saved activity code.
-  const legacyDigest = `${'a'.repeat(32)}:${'b'.repeat(64)}`;
-  await pool.query('UPDATE christmas_rehearsal_event SET access_digest = $1 WHERE singleton', [legacyDigest]);
-  assert.equal((await publicCall()).phase, 'registering');
-  await admin('start', {}, 409);
   await publicCall('register', '\u3000  ', 400);
   await publicCall('register', 42, 400);
 
@@ -79,49 +82,82 @@ test('rehearsal API and real PostgreSQL preserve the roster and a unique random 
   assert.equal((await publicCall()).teamCount, 1);
   assert.deepEqual((await publicCall()).results, []);
 
-  const extraNames = ['测试琴组', '测试唱诗组', '测试舞蹈组', '测试灯光组', '测试布景组', '测试器乐组', '测试短剧组'];
-  await admin('add', { names: [...extraNames, '误录小组', extraNames[0]].join('\n') });
+  await admin('add', { names: ['误录小组', '误录小组'].join('\n') });
   const beforeStart = await admin('remove', { name: '误录小组' });
-  assert.equal(beforeStart.state.teamCount, extraNames.length + 1);
-  assert.equal(beforeStart.teams.length, extraNames.length + 1);
+  assert.equal(beforeStart.state.teamCount, 1);
 
   const starts = await Promise.all(Array.from({ length: 8 }, () => admin('start')));
   const started = starts[0];
   assert.equal(started.state.phase, 'drawing');
   assert.ok(starts.every(({ state }) => state.phase === 'drawing'));
   assert.equal(started.state.drawnCount, 0);
+  assert.equal(started.state.remainingCount, 13);
   assert.deepEqual(started.state.results, []);
   assert.ok(started.teams.every((team) => team.number === null));
   assert.deepEqual(await publicCall(), started.state);
   await publicCall('draw', '', 400);
-  await publicCall('draw', '误录小组', 404);
-  await publicCall('register', '迟到小组', 409);
-  await admin('remove', { name: extraNames[0] }, 409);
-  const assignedBeforeAnyDraw = await pool.query('SELECT name, number FROM christmas_rehearsal_teams ORDER BY number');
-  assert.deepEqual(assignedBeforeAnyDraw.rows.map(({ number }) => number), Array.from({ length: extraNames.length + 1 }, (_, i) => i + 1));
+  assert.equal((await admin('finish', {}, 409)).error, 'draw_incomplete');
+  const beforeDraw = await pool.query('SELECT number FROM christmas_rehearsal_teams');
+  assert.deepEqual(beforeDraw.rows, [{ number: null }]);
 
-  // After locking, checking one group's number cannot reveal any other group's assignment.
-  const one = await publicCall('draw', normalizedVariants[0]);
-  assert.deepEqual(one.state.results, [one.team]);
-  const repeated = await Promise.all(normalizedVariants.map(name => publicCall('draw', name)));
-  assert.ok(repeated.every(({ team }) => team.number === one.team.number));
+  const newTeams = Array.from({ length: 12 }, (_, index) => `测试小组 ${index + 1}`);
+  const draws = await Promise.all([...normalizedVariants, ...newTeams, ...newTeams.slice(0, 4)].map(
+    (name) => publicCall('draw', name),
+  ));
+  assert.ok(draws.every(({ state }) => state.remainingCount === 13 - state.drawnCount));
+  const assigned = new Map(draws.map(({ team }) => [team.name, team.number]));
+  assert.equal(assigned.size, 13);
+  assert.ok(draws.every(({ team }) => team.number === assigned.get(team.name)));
 
-  const revealed = await Promise.all([...extraNames.slice(0, -1), ...extraNames.slice(0, -1).reverse()].map(name => publicCall('draw', name)));
-  const distinctResults = new Map(revealed.map(({ team }) => [team.name, team.number]));
-  assert.equal(distinctResults.size, extraNames.length - 1);
-  assert.equal(new Set([one.team.number, ...distinctResults.values()]).size, extraNames.length);
-  assert.ok(revealed.every(({ team }) => team.number === distinctResults.get(team.name)));
+  const complete = await publicCall();
+  const completeNumbers = Array.from({ length: 13 }, (_, index) => index + 1);
+  assert.equal(complete.phase, 'finished');
+  assert.equal(complete.teamCount, 13);
+  assert.equal(complete.remainingCount, 0);
+  assert.deepEqual(complete.results.map(({ number }) => number), completeNumbers);
+  assert.equal((await publicCall('draw', '超出名额的小组', 409)).error, 'pool_full');
+  assert.deepEqual(await publicCall(), complete);
 
-  // Complete the lottery with one group remaining and verify its preassigned rank is preserved.
-  const done = await admin('finish');
-  assert.equal(done.state.phase, 'finished');
-  assert.equal(done.state.drawnCount, extraNames.length + 1);
-  assert.deepEqual(done.state.results, assignedBeforeAnyDraw.rows);
-  assert.equal(done.state.results.find(({ name }) => name === one.team.name).number, one.team.number);
-  assert.ok(done.state.results.every(({ name, number }) => !distinctResults.has(name) || distinctResults.get(name) === number));
-  assert.deepEqual(await publicCall(), done.state);
-  assert.deepEqual((await publicCall('draw', normalizedVariants[1])).team, one.team);
-  assert.deepEqual((await admin('start')).state, done.state);
-  assert.deepEqual((await admin('finish')).state, done.state);
-  assert.deepEqual((await admin('adminState')).state, done.state);
+  const removed = complete.results[5];
+  const staleNumber = removed.number === 1 ? 2 : 1;
+  assert.equal((await admin('remove', { name: removed.name, expectedNumber: staleNumber }, 409)).error, 'stale_team');
+  assert.deepEqual(await publicCall(), complete);
+  const reopened = await admin('remove', { name: removed.name, expectedNumber: removed.number });
+  assert.equal(reopened.state.phase, 'drawing');
+  assert.equal(reopened.state.remainingCount, 1);
+  const unchanged = complete.results.filter(({ name }) => name !== removed.name);
+  assert.deepEqual(reopened.state.results, unchanged);
+
+  const replacementName = '更正后的小组';
+  const replacements = await Promise.all(Array.from({ length: 6 }, () => publicCall('draw', replacementName)));
+  assert.ok(replacements.every(({ team, state }) => team.number === removed.number && state.phase === 'finished'));
+  const repaired = await publicCall();
+  assert.equal(repaired.remainingCount, 0);
+  assert.deepEqual(repaired.results.map(({ number }) => number), completeNumbers);
+  assert.deepEqual(repaired.results.filter(({ name }) => name !== replacementName), unchanged);
+  assert.equal((await publicCall('draw', removed.name, 409)).error, 'pool_full');
+  assert.deepEqual((await admin('start')).state, repaired);
+  assert.deepEqual((await admin('adminState')).state, repaired);
+});
+
+test('a roster-free draw can open before registration, and prior assignments remain valid', requiresPostgres, async (t) => {
+  const { pool, publicCall, admin } = await setupPostgres(t);
+  const started = await admin('start');
+  assert.equal(started.state.phase, 'drawing');
+  assert.equal(started.state.teamCount, 0);
+
+  // Simulate a round created before this release, with a saved code and an unrevealed old assignment.
+  const legacyDigest = `${'a'.repeat(32)}:${'b'.repeat(64)}`;
+  await pool.query('UPDATE christmas_rehearsal_event SET access_digest = $1 WHERE singleton', [legacyDigest]);
+  await pool.query('INSERT INTO christmas_rehearsal_teams (name_key, name, number, revealed) VALUES ($1, $1, 1, true), ($2, $2, 2, false)', [
+    '已经抽号小组',
+    '原有待抽小组',
+  ]);
+  assert.deepEqual((await publicCall()).results, [{ name: '已经抽号小组', number: 1 }]);
+  const late = await publicCall('draw', '新加入小组');
+  assert.ok(late.team.number >= 3 && late.team.number <= 13);
+  assert.deepEqual((await publicCall('draw', '原有待抽小组')).team, { name: '原有待抽小组', number: 2 });
+  assert.deepEqual((await publicCall('draw', '已经抽号小组')).team, { name: '已经抽号小组', number: 1 });
+  const { rows } = await pool.query('SELECT access_digest FROM christmas_rehearsal_event WHERE singleton');
+  assert.equal(rows[0].access_digest, legacyDigest);
 });

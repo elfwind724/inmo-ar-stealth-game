@@ -1,0 +1,190 @@
+#draw-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-top: 15px;
+  padding: 13px 15px 15px;
+  border: 1px solid #335f50;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse at 50% 115%, #40775c 0%, transparent 66%),
+    radial-gradient(ellipse at 50% 16%, #29644d9c, transparent 72%),
+    #0b392b;
+  color: #fff1c8;
+  text-align: center;
+}
+
+#draw-stage::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: repeating-radial-gradient(ellipse at 50% 55%, transparent 0 27px, #a9cfab36 28px, transparent 29px 54px);
+  mask-image: linear-gradient(90deg, #000, transparent 36%, transparent 64%, #000);
+  pointer-events: none;
+}
+
+#draw-caption {
+  min-height: 1.4em;
+  color: #e9f5eb;
+  font-size: .88rem;
+  font-weight: 750;
+  line-height: 1.4;
+  letter-spacing: .10em;
+}
+
+#draw-stage .draw-display {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  width: clamp(104px, 43%, 158px);
+  height: clamp(74px, 21vw, 100px);
+  margin: 8px auto 0;
+  border: 1px solid #aabc9d69;
+  border-radius: 13px;
+  background: linear-gradient(180deg, #0d3328, #18543e 52%, #113c2f);
+  box-shadow: inset 0 1px 0 #d7efcc29, inset 0 10px 17px #0a281c55, 0 4px 11px #09291e66;
+}
+
+#draw-stage .draw-display::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, #b3dfad19, transparent 35%, transparent 68%, #0d281e43);
+  pointer-events: none;
+}
+
+#draw-number, #draw-stage .draw-prior-number {
+  font-size: clamp(2.9rem, 13vw, 4.45rem);
+  font-weight: 800;
+  line-height: 1.12;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -.055em;
+  text-shadow: 0 2px 0 #7c6d3e7d, 0 0 14px #f4d78338;
+}
+
+#draw-number {
+  position: relative;
+  display: block;
+  padding-right: .055em;
+}
+
+#draw-stage .draw-prior-number {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-items: center;
+  padding-right: .055em;
+  pointer-events: none;
+}
+
+#draw-number + span {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1.25;
+  opacity: 0;
+}
+
+#draw-team {
+  min-height: 1.45em;
+  margin-top: 8px;
+  color: #eef9ef;
+  font-size: 1.02rem;
+  font-weight: 750;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+#draw-stage[data-state="result"] {
+  border-color: #d6aa55;
+  background:
+    radial-gradient(ellipse at 50% 48%, #95744569 0%, transparent 57%),
+    radial-gradient(ellipse at 50% 115%, #40775c 0%, transparent 66%),
+    #0b392b;
+  box-shadow: 0 4px 12px #15352824;
+}
+
+#draw-stage[data-state="result"] #draw-caption { color: #ffe8aa; }
+
+#draw-stage[data-state="result"] .draw-display {
+  border-color: #e7bf6f;
+  box-shadow: inset 0 0 19px #ffdb7033, 0 0 26px #f2af4752;
+}
+
+#draw-stage[data-state="result"] #draw-number {
+  color: #fff3bf;
+  text-shadow: 0 2px 0 #9e7138, 0 0 18px #ffdd6d72;
+  animation: draw-number-lock 540ms cubic-bezier(.24,.99,.38,1.11) both;
+}
+
+#draw-stage[data-state="result"] #draw-number + span { opacity: 1; }
+
+#draw-stage[data-state="result"] .draw-display::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(108deg, transparent 25%, #ffe8a02e 50%, transparent 66%);
+  pointer-events: none;
+  animation: draw-gold-sweep 720ms ease-out both;
+}
+
+#draw-stage .draw-sparks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#draw-stage .draw-sparks i {
+  position: absolute;
+  left: 50%;
+  top: 53%;
+  width: 4px;
+  height: 10px;
+  border-radius: 1px;
+  background: #ffdb75;
+  box-shadow: 0 0 6px #efbf6155;
+  opacity: 0;
+}
+
+#draw-stage .draw-sparks i:nth-child(1) { --x: -86px; --y: -54px; --angle: -38deg; --delay: 0ms; }
+#draw-stage .draw-sparks i:nth-child(2) { --x: -108px; --y: -18px; --angle: -64deg; --delay: 50ms; }
+#draw-stage .draw-sparks i:nth-child(3) { --x: -98px; --y: 24px; --angle: -106deg; --delay: 15ms; }
+#draw-stage .draw-sparks i:nth-child(4) { --x: -61px; --y: 49px; --angle: -128deg; --delay: 72ms; }
+#draw-stage .draw-sparks i:nth-child(5) { --x: 81px; --y: -55px; --angle: 36deg; --delay: 38ms; }
+#draw-stage .draw-sparks i:nth-child(6) { --x: 111px; --y: -22px; --angle: 70deg; --delay: 0ms; }
+#draw-stage .draw-sparks i:nth-child(7) { --x: 104px; --y: 24px; --angle: 106deg; --delay: 68ms; }
+#draw-stage .draw-sparks i:nth-child(8) { --x: 62px; --y: 46px; --angle: 132deg; --delay: 30ms; }
+#draw-stage .draw-sparks i:nth-child(3n) { height: 5px; width: 5px; background: #eff6c0; }
+
+#draw-stage[data-state="result"] .draw-sparks i {
+  animation: draw-spark-flight 710ms cubic-bezier(.18,.63,.35,1) var(--delay) both;
+}
+
+@keyframes draw-number-lock {
+  0% { opacity: .65; transform: translateY(21%) scale(.86); }
+  48% { opacity: 1; transform: translateY(-3%) scale(1.10); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes draw-gold-sweep {
+  0% { transform: translateX(-125%); opacity: 0; }
+  25%, 65% { opacity: 1; }
+  100% { transform: translateX(125%); opacity: 0; }
+}
+
+@keyframes draw-spark-flight {
+  0% { opacity: 0; transform: translate(0, 0) rotate(var(--angle)) scale(.6); }
+  28% { opacity: .95; }
+  100% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--angle)) scale(.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #draw-stage[data-state="result"] #draw-number,
+  #draw-stage[data-state="result"] .draw-display::after,
+  #draw-stage[data-state="result"] .draw-sparks i { animation: none; }
+}

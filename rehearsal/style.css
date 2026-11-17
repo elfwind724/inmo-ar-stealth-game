@@ -164,24 +164,11 @@ textarea { resize: vertical; }
 .secondary.compact { padding-inline: 13px; }
 form > .button { width: 100%; margin-top: 12px; }
 
-.notice, .my-result { margin-top: 13px; border-radius: 12px; overflow-wrap: anywhere; }
-.notice { padding: 11px 13px; background: #e8f3e9; color: #174b35; font-size: 1rem; }
+.notice { margin-top: 13px; border-radius: 12px; overflow-wrap: anywhere; padding: 11px 13px; background: #e8f3e9; color: #174b35; font-size: 1rem; }
 .error { background: #fceee9; color: #882d24; }
-.my-result {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 17px;
-  border: 1px solid #c8e3d1;
-  background: #e7f5e9;
-  color: #194e36;
-}
-.result-caption { color: #3b6250; font-size: .94rem; }
-#my-team { margin-top: 4px; font-size: 1.16rem; font-weight: 750; overflow-wrap: anywhere; }
-.slot { flex-shrink: 0; display: flex; align-items: baseline; gap: 4px; line-height: 1; }
-.slot strong { font-size: 3rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.slot span { font-size: 1.05rem; font-weight: 700; }
+
+.button.remove-team { border-color: #ecd5cd; background: #fff7f3; color: #882d24; }
+.button.remove-team:hover:not(:disabled) { background: #fceee9; }
 
 .card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .card-heading h2 { padding-top: 4px; }
