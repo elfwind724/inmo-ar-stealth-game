@@ -17,7 +17,7 @@ const { outputFiles: [appBundle] } = await build({
   format: 'iife',
 });
 
-function openPage(t, hash, handler) {
+function openPage(t, hash, handler, { reducedMotion = true } = {}) {
   const dom = new JSDOM(html, { url: new URL(hash, url), runScripts: 'outside-only', pretendToBeVisual: true });
   const { window } = dom;
   const requests = [];
@@ -26,7 +26,7 @@ function openPage(t, hash, handler) {
     return handler(new Request(new URL(path, url), options));
   };
   window.confirm = () => true;
-  window.matchMedia = (query) => ({ matches: query === '(prefers-reduced-motion: reduce)' });
+  window.matchMedia = (query) => ({ matches: reducedMotion && query === '(prefers-reduced-motion: reduce)' });
   window.eval(appBundle.text);
   t.after(() => window.close());
   const node = (id) => window.document.getElementById(id);
@@ -51,9 +51,9 @@ async function until(check, message) {
   assert.fail(message);
 }
 
-test('a participant draws with just a name and an organizer can return a number from the public list', async (t) => {
+function createTestEvent(phase) {
   const key = randomBytes(24).toString('hex');
-  let event = { phase: 'closed', teams: [] };
+  let event = { phase, teams: [] };
   const handler = createRehearsalHandler({
     getAdminKey: () => key,
     store: {
@@ -66,6 +66,12 @@ test('a participant draws with just a name and an organizer can return a number 
       },
     },
   });
+  return { handler, key, get event() { return event; } };
+}
+
+test('a participant draws with just a name and an organizer can return a number from the public list', async (t) => {
+  const fixture = createTestEvent('closed');
+  const { handler, key } = fixture;
   const organizer = openPage(t, '#organizer', handler);
   assert.ok(organizer.visible('organizer'));
   assert.equal(organizer.visible('participants'), false);
@@ -97,7 +103,7 @@ test('a participant draws with just a name and an organizer can return a number 
   organizer.click('admin-refresh');
   await until(() => organizer.text('roster').includes('测试音响组'), 'Organizer sees the cross-browser registration');
   organizer.click('admin-start');
-  await until(() => event.phase === 'drawing' && !organizer.node('admin-refresh').disabled, 'Organizer opens the draw');
+  await until(() => fixture.event.phase === 'drawing' && !organizer.node('admin-refresh').disabled, 'Organizer opens the draw');
   const participant = openPage(t, '', handler);
   await until(() => participant.node('phase-badge').dataset.phase === 'drawing', 'A fresh page can draw directly');
   assert.ok(participant.visible('team-form'));
@@ -150,4 +156,24 @@ test('a participant draws with just a name and an organizer can return a number 
   organizer.click('admin-logout');
   assert.equal(organizer.node('roster').children.length, 0);
   assert.ok(organizer.visible('auth-form'));
+});
+
+test('the animated draw hides reel numbers from assistive technology and settles on the server assignment', async (t) => {
+  const fixture = createTestEvent('drawing');
+  const participant = openPage(t, '', fixture.handler, { reducedMotion: false });
+  await until(() => participant.node('phase-badge').dataset.phase === 'drawing', 'The animation begins only on a ready draw');
+  participant.input('team-name', '动效测试小组');
+  participant.click('team-submit');
+  const stage = participant.node('draw-stage');
+  assert.equal(stage.dataset.state, 'spinning');
+  assert.equal(participant.node('draw-number').closest('[aria-hidden]').getAttribute('aria-hidden'), 'true');
+  await until(() => stage.dataset.state === 'settling', 'The number reel slows before revealing the award');
+  assert.equal(stage.nextElementSibling.textContent, '');
+  assert.equal(participant.node('results').children.length, 0);
+
+  await until(() => stage.dataset.state === 'result' && !participant.node('team-submit').disabled, 'The reel reaches the final number');
+  const award = fixture.event.teams[0];
+  assert.equal(participant.text('draw-number'), String(award.number));
+  assert.ok(stage.nextElementSibling.textContent.includes(`第 ${award.number} 号`));
+  assert.equal(participant.node('results').children.length, 1);
 });
