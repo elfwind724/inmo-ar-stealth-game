@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#14382f">
+  <title>2026 圣诞彩排抽号</title>
+  <link rel="stylesheet" href="/rehearsal/style.css">
+  <script type="module" src="/rehearsal/app.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="hero-art" aria-hidden="true"><span></span></div>
+      <div class="hero-copy">
+        <p class="event">2026 <span>·</span> 教堂圣诞活动</p>
+        <h1>圣诞彩排抽号</h1>
+        <p>各组凭小组名称抽号，按抽出的顺序彩排。</p>
+      </div>
+    </header>
+
+    <main id="participants" class="layout">
+      <section class="card action-card" aria-labelledby="action-title">
+        <div id="phase-badge" class="phase"><span></span><strong id="phase-label">正在连接</strong></div>
+        <h2 id="action-title">获取活动状态</h2>
+        <p id="action-detail" class="muted">正在读取最新的报名和抽号信息。</p>
+        <form id="access-form" novalidate hidden>
+          <label for="access-code">活动口令</label>
+          <input id="access-code" type="password" autocomplete="current-password" maxlength="64">
+          <button id="access-submit" class="button primary" type="submit">查看彩排顺序</button>
+        </form>
+        <form id="team-form" novalidate hidden>
+          <label for="team-name">小组名称</label>
+          <input id="team-name" name="team-name" type="text" placeholder="请输入完整的小组名称" autocomplete="off" maxlength="80">
+          <button id="team-submit" class="button primary" type="submit">抽号</button>
+        </form>
+        <p id="team-error" class="notice error" role="alert" hidden></p>
+        <p id="team-message" class="notice" role="status" hidden></p>
+        <div id="my-result" class="my-result" role="status" hidden>
+          <p id="my-team"></p>
+          <p class="slot"><strong id="my-number"></strong><span>号</span></p>
+          <p>这是你们小组的彩排顺序。</p>
+        </div>
+      </section>
+
+      <section class="card order-card" aria-labelledby="order-title">
+        <div class="card-heading">
+          <div>
+            <h2 id="order-title">彩排顺序</h2>
+            <p id="order-summary" class="muted">抽出的号码会在这里公布。</p>
+          </div>
+          <button id="refresh" class="button secondary compact" type="button">刷新</button>
+        </div>
+        <ol id="results" class="results" aria-label="按号码排序的彩排名单" hidden></ol>
+        <p id="empty-results" class="empty">正在获取名单…</p>
+        <p id="refresh-notice" class="refresh-notice muted" role="status" hidden></p>
+      </section>
+    </main>
+
+    <main id="organizer" class="layout organizer-layout" hidden>
+      <section class="card action-card" aria-labelledby="organizer-title">
+        <h2 id="organizer-title">负责人入口</h2>
+        <p id="organizer-hint" class="muted">输入负责人口令后管理报名和抽号。</p>
+        <form id="auth-form" novalidate>
+          <label for="organizer-key">负责人口令</label>
+          <input id="organizer-key" type="password" autocomplete="current-password" maxlength="128" required>
+          <button class="button primary" type="submit">进入管理</button>
+        </form>
+        <div id="admin-controls" hidden>
+          <form id="admin-roster-form" novalidate>
+            <label for="roster-input">小组名单（选填）</label>
+            <p id="roster-help" class="muted form-help">一行一个名字。也可以留空，让各组自行报名。</p>
+            <textarea id="roster-input" rows="5" maxlength="42000" aria-describedby="roster-help" placeholder="每行填写一个小组名称"></textarea>
+            <div id="admin-code-row" class="field">
+              <label for="admin-code">活动口令（选填）</label>
+              <input id="admin-code" type="password" autocomplete="new-password" minlength="6" maxlength="64" aria-describedby="code-help">
+              <p id="code-help" class="muted field-help">可用 6 至 64 个英文字母、数字或半角符号。设好后发给各组，留空时持链接即可参与。</p>
+            </div>
+            <button id="admin-roster-submit" class="button primary" type="submit">开放报名</button>
+          </form>
+          <div class="admin-buttons">
+            <button id="admin-start" class="button primary" type="button" hidden>锁定名单并开放抽号</button>
+            <button id="admin-finish" class="button secondary" type="button" hidden>公布剩余号码并结束</button>
+            <button id="admin-export" class="button secondary" type="button" hidden>下载彩排名单</button>
+            <button id="admin-logout" class="button secondary" type="button">退出管理</button>
+          </div>
+        </div>
+        <p id="admin-error" class="notice error" role="alert" hidden></p>
+        <p id="admin-message" class="notice" role="status" hidden></p>
+      </section>
+
+      <section id="admin-list" class="card order-card" aria-labelledby="roster-title" hidden>
+        <div class="card-heading">
+          <div>
+            <h2 id="roster-title">报名名单</h2>
+            <p id="roster-summary" class="muted"></p>
+          </div>
+          <button id="admin-refresh" class="button secondary compact" type="button">刷新</button>
+        </div>
+        <ul id="roster" class="results" aria-label="报名名单" hidden></ul>
+        <p id="empty-roster" class="empty">还没有小组报名。</p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>2026 圣诞彩排</p>
+      <a id="view-link" href="#organizer">负责人入口</a>
+    </footer>
+  </div>
+</body>
+</html>

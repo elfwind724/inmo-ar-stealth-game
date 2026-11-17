@@ -6,10 +6,11 @@
   "scripts": {
     "build": "node tools/build.mjs",
     "dev": "node tools/serve.mjs",
-    "test": "node --test tests/theater-show.test.cjs"
+    "test": "node --test tests/theater-show.test.cjs tests/rehearsal.test.mjs tests/rehearsal-ui.test.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",
+    "@netlify/database": "2.0.3",
     "three": "0.128.0"
   },
   "devDependencies": {

@@ -18,6 +18,7 @@ for(const file of assets)await fs.copyFile(path.join(root,'assets',file),path.jo
 const models=path.join(root,'assets/theater-models');
 await fs.cp(models,path.join(dist,'assets/theater-models'),{recursive:true});
 await fs.writeFile(path.join(dist,'index.html'),html);
+await fs.cp(path.join(root,'rehearsal'),path.join(dist,'rehearsal'),{recursive:true});
 let standalone=html;
 const mime={'.jpg':'image/jpeg','.mp3':'audio/mpeg','.glb':'model/gltf-binary','.png':'image/png'};
 const assetData={};
@@ -35,4 +36,4 @@ for(const [file,data] of Object.entries(assetData))standalone=standalone.replace
 const css=await fs.readFile(path.join(dist,'theater.css'),'utf8');standalone=standalone.replace('<link rel="stylesheet" href="./theater.css">',()=>'<style>'+css+'</style>');
 await fs.mkdir(path.join(root,'release'),{recursive:true});
 for(const file of ['inmo_launch_event.html','inmo_3d_ar_optimized.html'])await fs.writeFile(path.join(root,'release',file),standalone);
-console.log('Built first-person INMO comedy theater, local models, music and offline release.');
+console.log('Built INMO theater, offline release and /rehearsal/.');
