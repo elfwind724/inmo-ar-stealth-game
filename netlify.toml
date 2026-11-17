@@ -1,12 +1,12 @@
 [build]
-  command = "npm run build"
-  publish = "dist"
+  command = "npm run build:rehearsal"
+  publish = "dist-rehearsal"
 
 [build.environment]
   NODE_VERSION = "22"
 
 [[headers]]
-  for = "/rehearsal/*"
+  for = "/*"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
     X-Content-Type-Options = "nosniff"
