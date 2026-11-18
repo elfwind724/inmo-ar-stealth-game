@@ -16,11 +16,13 @@ const rosterInput = byId('roster-input');
 const startButton = byId('admin-start');
 const exportButton = byId('admin-export');
 const clearButton = byId('admin-clear');
+const limitForm = byId('admin-limit-form');
+const numberLimitInput = byId('admin-number-limit');
 
 const phases = {
   closed: ['尚未开始', '开放时间请等负责人通知。', '抽号'],
   registering: ['报名中', '登记好小组后，等通知再来抽号。', '登记小组'],
-  drawing: ['可以抽号', '填好小组名称，抽取 1–13 号。', '抽号'],
+  drawing: ['可以抽号', '', '抽号'],
   finished: ['抽号结束', '输入小组名称可查看原号码。', '查看号码'],
 };
 
@@ -109,6 +111,7 @@ function renderPublic(nextState) {
   if (state?.phase === nextState.phase
       && state.teamCount === nextState.teamCount
       && state.remainingCount === nextState.remainingCount
+      && state.numberLimit === nextState.numberLimit
       && state.results.length === nextState.results.length
       && state.results.every((team, index) => team.name === nextState.results[index].name && team.number === nextState.results[index].number)) {
     feedback('refresh-notice');
@@ -117,7 +120,9 @@ function renderPublic(nextState) {
   if (state?.phase !== nextState.phase) clearTeamFeedback();
   state = nextState;
   const [label, detail, button] = phases[state.phase];
-  phaseLabel(state.phase, label, detail);
+  phaseLabel(state.phase, label, state.phase === 'drawing'
+    ? `填好小组名称，抽取 1–${state.numberLimit} 号。`
+    : detail);
   teamSubmit.textContent = button;
   const orderSummary = byId('order-summary');
   orderSummary.hidden = state.phase === 'closed';
@@ -192,7 +197,7 @@ teamForm.addEventListener('submit', async (event) => {
     teamSubmit.textContent = action === 'register' ? '正在登记…' : isLookup ? '正在查询…' : '正在抽号…';
     if (action === 'draw' && !isLookup) {
       teamName.blur();
-      drawMotion.spin();
+      drawMotion.spin(state.numberLimit);
       drawStage.scrollIntoView?.({ block: 'nearest' });
     }
     const result = await request({ action, name });
@@ -247,12 +252,14 @@ function renderAdmin(payload) {
   adminControls.hidden = false;
   byId('admin-list').hidden = false;
   byId('organizer-hint').textContent = `当前状态：${phases[event.phase][0]}`;
+  numberLimitInput.value = event.numberLimit;
+  numberLimitInput.removeAttribute('aria-invalid');
   rosterForm.hidden = !(closed || registering);
   byId('roster-input').labels[0].textContent = closed ? '小组名单（选填）' : '补充小组名单';
   byId('roster-help').textContent = closed ? '一行一个名字。也可以留空，让各组自行报名。' : '每行填写一个要增加的小组名称。';
   byId('admin-roster-submit').textContent = closed ? '开放报名' : '添加小组';
   startButton.hidden = !(closed || registering || canResume);
-  startButton.textContent = canResume ? '重新开放剩余号码' : '开放抽号（1–13 号）';
+  startButton.textContent = canResume ? '重新开放剩余号码' : `开放抽号（1–${event.numberLimit} 号）`;
   exportButton.hidden = event.results.length === 0;
   clearButton.hidden = teams.length === 0;
   const roster = byId('roster');
@@ -286,6 +293,7 @@ function logout() {
   adminState = undefined;
   keyInput.value = '';
   rosterInput.value = '';
+  numberLimitInput.value = '';
   authForm.hidden = false;
   adminControls.hidden = true;
   byId('admin-list').hidden = true;
@@ -351,7 +359,7 @@ rosterForm.addEventListener('submit', async (event) => {
 });
 
 startButton.addEventListener('click', () => {
-  if (window.confirm('现在开放抽号？各组填写自己的小组名称后即可抽取 1–13 号。')) {
+  if (window.confirm(`现在开放抽号？各组填写自己的小组名称后即可抽取 1–${adminState.state.numberLimit} 号。`)) {
     void adminAction({ action: 'start' }, '抽号已开放，各组可以开始抽号。');
   }
 });
@@ -375,11 +383,28 @@ exportButton.addEventListener('click', () => {
 });
 
 byId('admin-refresh').addEventListener('click', () => void adminAction({ action: 'adminState' }, '已更新。'));
+limitForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (adminSubmitting || !adminState) return;
+  const numberLimit = Number(numberLimitInput.value);
+  if (!Number.isInteger(numberLimit) || numberLimit < 1 || numberLimit > 500) {
+    feedback('admin-error', '最大号码请输入 1–500 的整数。');
+    numberLimitInput.setAttribute('aria-invalid', 'true');
+    numberLimitInput.focus();
+    return;
+  }
+  await adminAction({
+    action: 'setLimit',
+    numberLimit,
+    expectedLimit: adminState.state.numberLimit,
+  }, `最大号码已保存，当前范围为 1–${numberLimit}。`);
+});
 clearButton.addEventListener('click', () => {
   if (adminSubmitting || !adminState?.teams.length) return;
   const expectedTeams = adminState.teams.map(({ name, number }) => ({ name, number }));
-  if (window.confirm(`确定清空全部 ${expectedTeams.length} 条小组记录？\n已抽号码会全部退回，1–13 号恢复可抽。`)) {
-    void adminAction({ action: 'clear', expectedTeams }, '全部记录已清空，1–13 号已恢复。');
+  const numberLimit = adminState.state.numberLimit;
+  if (window.confirm(`确定清空全部 ${expectedTeams.length} 条小组记录？\n已抽号码会全部退回，1–${numberLimit} 号恢复可抽。`)) {
+    void adminAction({ action: 'clear', expectedTeams }, `全部记录已清空，1–${numberLimit} 号已恢复。`);
   }
 });
 byId('admin-logout').addEventListener('click', () => {

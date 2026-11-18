@@ -1,5 +1,5 @@
 const readEvent = `
-  SELECT phase
+  SELECT phase, number_limit
   FROM christmas_rehearsal_event WHERE singleton
 `;
 
@@ -9,6 +9,7 @@ function eventState(event, rows) {
   if (!event) throw new Error('Rehearsal event row is missing');
   return {
     phase: event.phase,
+    numberLimit: event.number_limit,
     teams: rows.filter((row) => row.name_key !== null).map((row) => ({
       key: row.name_key,
       name: row.name,
@@ -42,10 +43,10 @@ async function saveChanges(client, before, after) {
     `, [JSON.stringify(changed)]);
   }
 
-  if (before.phase !== after.phase) {
+  if (before.phase !== after.phase || before.numberLimit !== after.numberLimit) {
     await client.query(`
-      UPDATE christmas_rehearsal_event SET phase = $1 WHERE singleton
-    `, [after.phase]);
+      UPDATE christmas_rehearsal_event SET phase = $1, number_limit = $2 WHERE singleton
+    `, [after.phase, after.numberLimit]);
   }
 }
 
@@ -53,7 +54,7 @@ export function createPostgresStore(getPool) {
   return {
     async read() {
       const { rows } = await getPool().query(`
-        SELECT event.phase, team.name_key, team.name, team.number, team.revealed
+        SELECT event.phase, event.number_limit, team.name_key, team.name, team.number, team.revealed
         FROM christmas_rehearsal_event AS event
         LEFT JOIN christmas_rehearsal_teams AS team ON true
         WHERE event.singleton

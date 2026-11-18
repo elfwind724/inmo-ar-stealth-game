@@ -1,9 +1,9 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 
-const numberLimit = 13;
-const drawNumbers = Array.from({ length: numberLimit }, (_, index) => index + 1);
-const maxBodyBytes = 64 * 1024;
-const adminActions = new Set(['adminState', 'open', 'add', 'remove', 'clear', 'start', 'finish']);
+const defaultNumberLimit = 13;
+const maximumNumberLimit = 500;
+const maxBodyBytes = 128 * 1024;
+const adminActions = new Set(['adminState', 'open', 'add', 'remove', 'clear', 'setLimit', 'start', 'finish']);
 const nameOrder = new Intl.Collator('zh-CN');
 const responseHeaders = {
   'Cache-Control': 'no-store',
@@ -36,7 +36,11 @@ function teamName(value) {
   return { key: name.toLowerCase(), name, number: null, revealed: false };
 }
 
-function namesFrom(value) {
+function getNumberLimit(state) {
+  return state.numberLimit ?? defaultNumberLimit;
+}
+
+function namesFrom(value, numberLimit) {
   const values = typeof value === 'string' ? value.split(/\r\n|\n|\r/u).filter((name) => name.trim()) : value ?? [];
   if (!Array.isArray(values) || values.length > numberLimit) {
     reject(400, 'invalid_names', `请每行输入一个小组名称，名单最多容纳 ${numberLimit} 组。`);
@@ -48,12 +52,13 @@ function teamResult(team) {
   return { name: team.name, number: team.revealed ? team.number : null };
 }
 
-function isDrawNumber(number) {
+function isDrawNumber(number, numberLimit) {
   return Number.isInteger(number) && number >= 1 && number <= numberLimit;
 }
 
-function remainingNumbers(teams) {
-  return numberLimit - teams.filter((team) => team.revealed && isDrawNumber(team.number)).length;
+function remainingNumbers(state) {
+  const numberLimit = getNumberLimit(state);
+  return numberLimit - state.teams.filter((team) => team.revealed && isDrawNumber(team.number, numberLimit)).length;
 }
 
 function publicState(state) {
@@ -62,8 +67,8 @@ function publicState(state) {
     phase: state.phase,
     teamCount: state.teams.length,
     drawnCount: results.length,
-    numberLimit,
-    remainingCount: remainingNumbers(state.teams),
+    numberLimit: getNumberLimit(state),
+    remainingCount: remainingNumbers(state),
     results,
   };
 }
@@ -92,6 +97,7 @@ function checkPhase(state, phase, message) {
 }
 
 function addTeams(state, teams) {
+  const numberLimit = getNumberLimit(state);
   const current = new Map(state.teams.map((team) => [team.key, team]));
   for (const team of teams) {
     if (!current.has(team.key)) current.set(team.key, team);
@@ -101,15 +107,17 @@ function addTeams(state, teams) {
 }
 
 function claimNumber(state, team) {
+  const numberLimit = getNumberLimit(state);
   // Earlier rounds could reserve an unpublished number for a registered group.
-  if (!isDrawNumber(team.number)) {
+  if (!isDrawNumber(team.number, numberLimit)) {
     const assigned = new Set(state.teams.map(({ number }) => number));
+    const drawNumbers = Array.from({ length: numberLimit }, (_, index) => index + 1);
     const available = drawNumbers.filter((number) => !assigned.has(number));
-    if (!available.length) reject(409, 'pool_full', '13 个彩排号码已分配，请联系负责人。');
+    if (!available.length) reject(409, 'pool_full', `${numberLimit} 个彩排号码已分配，请联系负责人。`);
     team.number = available[randomInt(available.length)];
   }
   team.revealed = true;
-  if (remainingNumbers(state.teams) === 0) state.phase = 'finished';
+  if (remainingNumbers(state) === 0) state.phase = 'finished';
 }
 
 function removeTeam(state, body) {
@@ -121,12 +129,12 @@ function removeTeam(state, body) {
     reject(409, 'stale_team', '这个小组的号码有变动，请刷新名单后再删除。');
   }
   state.teams.splice(index, 1);
-  if (state.phase === 'finished' && remainingNumbers(state.teams) > 0) state.phase = 'drawing';
+  if (state.phase === 'finished' && remainingNumbers(state) > 0) state.phase = 'drawing';
 }
 
 function clearTeams(state, expectedTeams) {
   if (state.teams.length === 0) return;
-  if (!Array.isArray(expectedTeams) || expectedTeams.length === 0 || expectedTeams.length > numberLimit) {
+  if (!Array.isArray(expectedTeams) || expectedTeams.length === 0 || expectedTeams.length > getNumberLimit(state)) {
     reject(400, 'invalid_roster', '请先刷新完整名单，再清空。');
   }
 
@@ -149,17 +157,36 @@ function clearTeams(state, expectedTeams) {
   if (state.phase === 'drawing' || state.phase === 'finished') state.phase = 'drawing';
 }
 
+function setNumberLimit(state, body) {
+  const nextLimit = body.numberLimit;
+  if (!Number.isInteger(nextLimit) || nextLimit < 1 || nextLimit > maximumNumberLimit) {
+    reject(400, 'invalid_limit', `最大号码请输入 1–${maximumNumberLimit} 的整数。`);
+  }
+  const currentLimit = getNumberLimit(state);
+  if (nextLimit === currentLimit) return;
+  if (Object.hasOwn(body, 'expectedLimit') && body.expectedLimit !== currentLimit) {
+    reject(409, 'stale_limit', '最大号码刚刚有变化，请刷新后再保存。');
+  }
+  if (state.teams.length > nextLimit || state.teams.some((team) => team.number > nextLimit)) {
+    reject(409, 'limit_in_use', '已有小组或已分配号码超出这个范围，请先核对并删除相关记录。');
+  }
+  state.numberLimit = nextLimit;
+  if (state.phase === 'drawing' || state.phase === 'finished') {
+    state.phase = remainingNumbers(state) > 0 ? 'drawing' : 'finished';
+  }
+}
+
 function applyAdmin(state, body) {
   switch (body.action) {
     case 'open':
       if (state.phase === 'registering') break;
       checkPhase(state, 'closed', '本轮抽号已锁定，无法重新开放报名。');
-      addTeams(state, namesFrom(body.names));
+      addTeams(state, namesFrom(body.names, getNumberLimit(state)));
       state.phase = 'registering';
       break;
     case 'add':
       checkPhase(state, 'registering', '只能在报名阶段补录小组。');
-      addTeams(state, namesFrom(body.names));
+      addTeams(state, namesFrom(body.names, getNumberLimit(state)));
       break;
     case 'remove':
       removeTeam(state, body);
@@ -167,13 +194,16 @@ function applyAdmin(state, body) {
     case 'clear':
       clearTeams(state, body.expectedTeams);
       break;
+    case 'setLimit':
+      setNumberLimit(state, body);
+      break;
     case 'start':
-      if (remainingNumbers(state.teams) > 0) state.phase = 'drawing';
+      if (remainingNumbers(state) > 0) state.phase = 'drawing';
       break;
     case 'finish':
       if (state.phase === 'finished') break;
       checkPhase(state, 'drawing', '请先开放抽号。');
-      if (remainingNumbers(state.teams) > 0) reject(409, 'draw_incomplete', '13 个号码还没有全部抽完。');
+      if (remainingNumbers(state) > 0) reject(409, 'draw_incomplete', `${getNumberLimit(state)} 个号码还没有全部抽完。`);
       state.phase = 'finished';
       break;
   }
@@ -181,6 +211,7 @@ function applyAdmin(state, body) {
 }
 
 function applyPublic(state, body) {
+  const numberLimit = getNumberLimit(state);
   const input = teamName(body.name);
   let team = state.teams.find(({ key }) => key === input.key);
   if (body.action === 'register') {
@@ -191,12 +222,12 @@ function applyPublic(state, body) {
     }
   } else if (!team?.revealed) {
     if (state.phase === 'finished') {
-      if (remainingNumbers(state.teams) === 0) reject(409, 'pool_full', '13 个彩排号码已分配，请联系负责人。');
+      if (remainingNumbers(state) === 0) reject(409, 'pool_full', `${numberLimit} 个彩排号码已分配，请联系负责人。`);
       reject(409, 'wrong_phase', '抽号已结束，请联系负责人。');
     }
     checkPhase(state, 'drawing', '负责人开放抽号后才能参加。');
     if (!team) {
-      if (state.teams.length >= numberLimit) reject(409, 'roster_full', '已有 13 个小组登记，请让负责人核对名单。');
+      if (state.teams.length >= numberLimit) reject(409, 'roster_full', `已有 ${numberLimit} 个小组登记，请让负责人核对名单。`);
       state.teams.push(input);
       team = input;
     }

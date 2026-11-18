@@ -198,6 +198,10 @@ form > .button { width: 100%; margin-top: 12px; }
 .group { flex: 1 1 auto; min-width: 0; font-size: 1.08rem; font-weight: 700; overflow-wrap: anywhere; }
 .refresh-notice { margin-top: 9px; }
 .admin-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.limit-settings { padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.limit-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.limit-row .button { min-width: 105px; }
+.limit-settings .muted { margin-top: 8px; }
 .admin-buttons .button { max-width: 100%; white-space: normal; }
 .form-help { margin-bottom: 8px; }
 .site-footer { display: flex; justify-content: center; padding: 3px 0 max(8px, env(safe-area-inset-bottom)); }

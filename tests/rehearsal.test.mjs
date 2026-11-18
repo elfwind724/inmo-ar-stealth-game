@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import test from 'node:test';
 import { createRehearsalHandler } from '../netlify/rehearsal/api.mjs';
 import { createPostgresStore } from '../netlify/rehearsal/postgres.mjs';
@@ -8,7 +8,7 @@ import { createPostgresStore } from '../netlify/rehearsal/postgres.mjs';
 const endpoint = 'http://localhost/rehearsal/api';
 const testDatabase = process.env.REHEARSAL_TEST_DATABASE_URL;
 const adminKey = randomBytes(24).toString('hex');
-const migration = new URL('../netlify/database/migrations/20261117000100_create_rehearsal.sql', import.meta.url);
+const migrations = new URL('../netlify/database/migrations/', import.meta.url);
 
 async function call(handler, action, fields = {}, { bearer, expectedStatus = 200 } = {}) {
   const headers = {};
@@ -29,7 +29,7 @@ test('the rehearsal API rejects missing or wrong organizer credentials without u
     store: new Proxy({}, { get: () => assert.fail('unauthorized request touched the database') }),
     getAdminKey: () => adminKey,
   });
-  for (const action of ['adminState', 'open', 'add', 'start', 'remove', 'clear', 'finish']) {
+  for (const action of ['adminState', 'open', 'add', 'start', 'remove', 'clear', 'setLimit', 'finish']) {
     await call(handler, action, { name: '测试小组', names: ['测试小组'] }, { expectedStatus: 401 });
     await call(handler, action, {}, { bearer: 'wrong-key', expectedStatus: 401 });
   }
@@ -56,13 +56,83 @@ async function setupPostgres(t) {
     }
   });
   await control.query(`CREATE SCHEMA ${schema}`);
-  await pool.query(await readFile(migration, 'utf8'));
+  for (const filename of (await readdir(migrations)).filter((name) => name.endsWith('.sql')).sort()) {
+    await pool.query(await readFile(new URL(filename, migrations), 'utf8'));
+  }
 
   const handler = createRehearsalHandler({ store: createPostgresStore(() => pool), getAdminKey: () => adminKey });
   const publicCall = (action, name, expectedStatus = 200) => call(handler, action, { name }, { expectedStatus });
   const admin = (action, fields, expectedStatus = 200) => call(handler, action, fields, { bearer: adminKey, expectedStatus });
-  return { pool, publicCall, admin };
+  return { pool, handler, publicCall, admin };
 }
+
+test('the organizer can extend a completed draw, preserve its awards and persist the chosen maximum', requiresPostgres, async (t) => {
+  const { pool, handler, publicCall, admin } = await setupPostgres(t);
+  for (const numberLimit of [0, 501, -1, 1.5, '14', null]) {
+    assert.equal((await admin('setLimit', { numberLimit, expectedLimit: 13 }, 400)).error, 'invalid_limit');
+  }
+  assert.equal((await publicCall()).numberLimit, 13);
+  assert.equal((await admin('setLimit', { numberLimit: 14, expectedLimit: 12 }, 409)).error, 'stale_limit');
+  await admin('start');
+  await Promise.all(Array.from({ length: 13 }, (_, index) => publicCall('draw', `原小组 ${index + 1}`)));
+  const original = await publicCall();
+  assert.equal(original.phase, 'finished');
+
+  const expanded = await admin('setLimit', { numberLimit: 14, expectedLimit: 13 });
+  assert.equal(expanded.state.phase, 'drawing');
+  assert.equal(expanded.state.numberLimit, 14);
+  assert.equal(expanded.state.remainingCount, 1);
+  assert.deepEqual(expanded.state.results, original.results);
+  const repeatedSave = await admin('setLimit', { numberLimit: 14, expectedLimit: 13 });
+  assert.deepEqual(repeatedSave.state, expanded.state, 'A retried successful save remains idempotent');
+
+  const lateDraws = await Promise.all(Array.from({ length: 8 }, () => publicCall('draw', '临时新增小组')));
+  assert.ok(lateDraws.every(({ team, state }) => team.number === 14 && state.phase === 'finished'));
+  const complete = await publicCall();
+  assert.deepEqual(complete.results.filter(({ number }) => number <= 13), original.results);
+  assert.equal((await publicCall('draw', '仍然超额的小组', 409)).error, 'pool_full');
+  assert.equal((await admin('setLimit', { numberLimit: 13, expectedLimit: 14 }, 409)).error, 'limit_in_use');
+  assert.equal((await admin('setLimit', { numberLimit: 15, expectedLimit: 13 }, 409)).error, 'stale_limit');
+  assert.deepEqual(await publicCall(), complete, 'Rejected settings cannot alter the existing draw');
+
+  const reloaded = createRehearsalHandler({ store: createPostgresStore(() => pool), getAdminKey: () => adminKey });
+  assert.deepEqual(await call(reloaded), complete, 'A new handler sees the saved maximum and the same awards');
+  assert.equal((await pool.query('SELECT number_limit FROM christmas_rehearsal_event')).rows[0].number_limit, 14);
+
+  const snapshot = await admin('adminState');
+  const cleared = await admin('clear', { expectedTeams: snapshot.teams });
+  assert.equal(cleared.state.numberLimit, 14);
+  assert.equal(cleared.state.remainingCount, 14);
+  assert.equal(cleared.state.phase, 'drawing');
+  assert.equal((await admin('setLimit', { numberLimit: 1, expectedLimit: 14 })).state.numberLimit, 1);
+  assert.equal((await publicCall('draw', '单组活动')).team.number, 1);
+  const large = await admin('setLimit', { numberLimit: 500, expectedLimit: 1 });
+  assert.equal(large.state.phase, 'drawing');
+  assert.equal(large.state.remainingCount, 499);
+  await admin('clear', { expectedTeams: large.teams });
+
+  const responses = await Promise.all([13, 14].map((numberLimit) => handler(new Request(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminKey}` },
+    body: JSON.stringify({ action: 'setLimit', numberLimit, expectedLimit: 500 }),
+  }))));
+  assert.deepEqual(responses.map(({ status }) => status).sort(), [200, 409], 'Concurrent settings cannot overwrite a newer maximum');
+  const accepted = await responses.find(({ status }) => status === 200).json();
+  assert.equal((await publicCall()).numberLimit, accepted.state.numberLimit);
+});
+
+test('lowering a maximum also checks registered teams and unrevealed reserved numbers', requiresPostgres, async (t) => {
+  const { pool, publicCall, admin } = await setupPostgres(t);
+  await admin('open', { names: ['第一组', '第二组'] });
+  assert.equal((await admin('setLimit', { numberLimit: 1, expectedLimit: 13 }, 409)).error, 'limit_in_use');
+  await admin('remove', { name: '第二组', expectedNumber: null });
+  await pool.query('UPDATE christmas_rehearsal_teams SET number = 13 WHERE name_key = $1', ['第一组']);
+  assert.equal((await admin('setLimit', { numberLimit: 12, expectedLimit: 13 }, 409)).error, 'limit_in_use');
+  assert.equal((await publicCall()).numberLimit, 13);
+  const snapshot = await admin('adminState');
+  await admin('clear', { expectedTeams: snapshot.teams });
+  assert.equal((await admin('setLimit', { numberLimit: 12, expectedLimit: 13 })).state.numberLimit, 12);
+});
 
 test('a concurrent rehearsal draw uses 1–13 once each and returns deleted awards to the pool', requiresPostgres, async (t) => {
   const { pool, publicCall, admin } = await setupPostgres(t);

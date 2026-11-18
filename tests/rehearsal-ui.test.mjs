@@ -53,7 +53,7 @@ async function until(check, message) {
 
 function createTestEvent(phase) {
   const key = randomBytes(24).toString('hex');
-  let event = { phase, teams: [] };
+  let event = { phase, numberLimit: 13, teams: [] };
   const handler = createRehearsalHandler({
     getAdminKey: () => key,
     store: {
@@ -206,4 +206,58 @@ test('the animated draw hides reel numbers from assistive technology and settles
   assert.equal(participant.text('draw-number'), String(award.number));
   assert.ok(stage.nextElementSibling.textContent.includes(`第 ${award.number} 号`));
   assert.equal(participant.node('results').children.length, 1);
+});
+
+test('the organizer adds a number after a full draw and every participant page shows the updated range', async (t) => {
+  const fixture = createTestEvent('drawing');
+  for (let index = 0; index < 13; index += 1) {
+    const response = await fixture.handler(new Request(new URL('api', url), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'draw', name: `已参加 ${index + 1}` }),
+    }));
+    assert.equal(response.status, 200);
+  }
+  const originalAwards = structuredClone(fixture.event.teams);
+  const participant = openPage(t, '', fixture.handler);
+  await until(() => participant.node('phase-badge').dataset.phase === 'finished', 'The initial 13-number draw has completed');
+  const organizer = openPage(t, '#organizer', fixture.handler);
+  organizer.input('organizer-key', fixture.key);
+  organizer.submit('auth-form');
+  await until(() => organizer.visible('admin-controls'), 'Organizer can access settings');
+  assert.ok(organizer.visible('admin-limit-form'));
+  assert.equal(organizer.node('admin-number-limit').value, '13');
+
+  organizer.input('admin-number-limit', '0');
+  const beforeInvalid = organizer.requests.length;
+  organizer.submit('admin-limit-form');
+  assert.equal(organizer.requests.length, beforeInvalid, 'An invalid limit is rejected before a request');
+  assert.ok(organizer.text('admin-error'));
+
+  organizer.input('admin-number-limit', '14');
+  organizer.submit('admin-limit-form');
+  await until(() => fixture.event.numberLimit === 14 && !organizer.node('admin-refresh').disabled, 'Organizer can save 14 as the maximum');
+  assert.equal(fixture.event.phase, 'drawing');
+  assert.deepEqual(fixture.event.teams, originalAwards);
+  const setting = organizer.requests.findLast(({ body }) => body?.action === 'setLimit');
+  assert.equal(setting.body.numberLimit, 14);
+  assert.equal(setting.body.expectedLimit, 13);
+
+  participant.click('refresh');
+  await until(() => participant.node('phase-badge').dataset.phase === 'drawing', 'Another phone sees the added number');
+  assert.match(participant.text('action-detail'), /1[–-]14/);
+  assert.equal(participant.text('team-submit'), '抽号');
+  participant.input('team-name', '临时追加小组');
+  participant.click('team-submit');
+  await until(() => participant.visible('draw-stage') && !participant.node('team-submit').disabled, 'The additional team can draw');
+  assert.equal(participant.text('draw-number'), '14');
+  assert.equal(fixture.event.teams.find(({ name }) => name === '临时追加小组').number, 14);
+  assert.match(participant.text('order-summary'), /14\s*\/\s*14/);
+  assert.deepEqual(fixture.event.teams.filter(({ number }) => number <= 13), originalAwards);
+
+  organizer.input('admin-number-limit', '13');
+  organizer.submit('admin-limit-form');
+  await until(() => organizer.text('admin-error') && !organizer.node('admin-refresh').disabled, 'A smaller occupied range is rejected');
+  assert.equal(fixture.event.numberLimit, 14);
+  assert.equal(fixture.event.teams.length, 14);
 });

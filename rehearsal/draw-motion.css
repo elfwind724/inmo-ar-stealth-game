@@ -38,7 +38,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  width: clamp(104px, 43%, 158px);
+  width: clamp(120px, 43%, 158px);
   height: clamp(74px, 21vw, 100px);
   margin: 8px auto 0;
   border: 1px solid #aabc9d69;

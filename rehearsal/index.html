@@ -64,6 +64,14 @@
           <button class="button primary" type="submit">进入管理</button>
         </form>
         <div id="admin-controls" hidden>
+          <form id="admin-limit-form" class="limit-settings" novalidate>
+            <label for="admin-number-limit">最大号码</label>
+            <div class="limit-row">
+              <input id="admin-number-limit" type="number" min="1" max="500" step="1" inputmode="numeric" aria-describedby="limit-help" required>
+              <button class="button primary" type="submit">保存设置</button>
+            </div>
+            <p id="limit-help" class="muted">可设置 1–500，保存后立即生效。</p>
+          </form>
           <form id="admin-roster-form" novalidate>
             <label for="roster-input">小组名单（选填）</label>
             <p id="roster-help" class="muted form-help">一行一个名字。也可以留空，让各组自行报名。</p>
@@ -71,7 +79,7 @@
             <button id="admin-roster-submit" class="button primary" type="submit">开放报名</button>
           </form>
           <div class="admin-buttons">
-            <button id="admin-start" class="button primary" type="button" hidden>开放 1–13 号抽签</button>
+            <button id="admin-start" class="button primary" type="button" hidden>开放抽号</button>
             <button id="admin-export" class="button secondary" type="button" hidden>下载彩排名单</button>
             <button id="admin-clear" class="button secondary remove-team" type="button" hidden>一键清空全部</button>
             <button id="admin-logout" class="button secondary" type="button">退出管理</button>

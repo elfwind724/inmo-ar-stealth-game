@@ -1,4 +1,3 @@
-const reel = [7, 3, 11, 6, 2, 9, 13, 5, 10, 1, 8, 4, 12];
 const slowdown = [96, 125, 162, 216];
 
 export function createDrawMotion(stage) {
@@ -27,6 +26,7 @@ export function createDrawMotion(stage) {
   stage.after(announcement);
 
   let position = 0;
+  let reel = [];
   let timer;
   let pendingReveal;
   let incoming;
@@ -64,8 +64,12 @@ export function createDrawMotion(stage) {
     ], { ...options, fill: 'both' });
   }
 
-  function spin() {
+  function spin(numberLimit = 13) {
     stop();
+    const limit = Number.isInteger(numberLimit) && numberLimit >= 1 && numberLimit <= 500 ? numberLimit : 13;
+    reel = Array.from({ length: limit }, (_, index) => (
+      index % 2 === 0 ? index / 2 + 1 : limit - Math.floor(index / 2)
+    ));
     position = 0;
     caption.textContent = '正在抽号';
     team.textContent = '';
