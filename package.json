@@ -6,8 +6,9 @@
   "scripts": {
     "build": "node tools/build.mjs",
     "build:rehearsal": "node tools/build-rehearsal.mjs",
+    "build:hub": "node tools/build-hub.mjs",
     "dev": "node tools/serve.mjs",
-    "test": "node --test tests/theater-show.test.cjs tests/rehearsal.test.mjs tests/rehearsal-ui.test.mjs"
+    "test": "node --test tests/theater-show.test.cjs tests/rehearsal.test.mjs tests/rehearsal-ui.test.mjs tests/hub.test.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",

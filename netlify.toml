@@ -1,6 +1,6 @@
 [build]
-  command = "npm run build:rehearsal"
-  publish = "dist-rehearsal"
+  command = "npm run build:hub"
+  publish = "dist-hub"
 
 [build.environment]
   NODE_VERSION = "22"
@@ -11,4 +11,23 @@
     X-Robots-Tag = "noindex, nofollow"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "no-referrer"
+
+[[headers]]
+  for = "/"
+  [headers.values]
     Content-Security-Policy = "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+
+[[headers]]
+  for = "/rehearsal/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+
+[[headers]]
+  for = "/inmo/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: blob:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"

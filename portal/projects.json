@@ -1,0 +1,20 @@
+[
+  {
+    "id": "rehearsal",
+    "title": "圣诞彩排抽号",
+    "description": "填上小组名，抽出你们的彩排顺序。",
+    "category": "tool",
+    "path": "/rehearsal/",
+    "image": "/portal-assets/chapel.webp",
+    "action": "进入抽号"
+  },
+  {
+    "id": "inmo",
+    "title": "INMO · 好戏开场",
+    "description": "坐进发布会，一起看一场群友喜剧。",
+    "category": "game",
+    "path": "/inmo/",
+    "image": "/portal-assets/inmo.webp",
+    "action": "入座看戏"
+  }
+]

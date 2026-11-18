@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f7f2">
+  <meta name="description" content="Yiage 项目集，打开圣诞彩排抽号、INMO 发布会剧场和更多原创项目。">
+  <title>Yiage · 项目集</title>
+  <link rel="stylesheet" href="/portal-assets/style.css">
+  <script type="module" src="/portal-assets/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#projects">跳到项目列表</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="Yiage 首页">
+        <span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="brand-word">yiage<span class="brand-dot">.</span></span>
+      </a>
+      <span class="header-caption">小游戏与实用工具</span>
+      <a class="header-link" href="#projects">浏览项目 <span aria-hidden="true">↘</span></a>
+    </div>
+  </header>
+
+  <main id="projects" class="page">
+    <div class="page-heading">
+      <div>
+        <h1>我们的项目</h1>
+      </div>
+      <form class="search-form" role="search">
+        <label class="visually-hidden" for="project-search">搜索项目</label>
+        <span class="search-icon" aria-hidden="true"></span>
+        <input id="project-search" type="search" placeholder="找个项目…" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        <button id="clear-search" class="clear-search" type="button" aria-label="清除搜索" hidden>×</button>
+      </form>
+    </div>
+
+    <nav id="category-filters" class="category-filters" aria-label="项目分类">
+      <button class="filter-button active" type="button" data-filter="all" aria-pressed="true">全部项目</button>
+      <button class="filter-button" type="button" data-filter="tool" aria-pressed="false">实用工具</button>
+      <button class="filter-button" type="button" data-filter="game" aria-pressed="false">互动游戏</button>
+    </nav>
+
+    <section id="projects-grid" class="projects-grid" aria-label="项目列表">
+      <!-- PROJECT_CARDS -->
+    </section>
+
+    <div id="empty-state" class="empty-state" role="status" hidden>
+      <p>没有找到这个项目</p>
+      <button id="reset-filters" class="reset-filters" type="button">查看全部项目 <span aria-hidden="true">↗</span></button>
+    </div>
+    <p id="search-status" class="visually-hidden" role="status"></p>
+  </main>
+
+  <footer class="site-footer"><a href="/" aria-label="回到 Yiage 首页">yiage.vip</a></footer>
+</body>
+</html>

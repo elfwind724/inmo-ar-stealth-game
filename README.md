@@ -1,4 +1,12 @@
-# INMO · 好戏开场
+# Yiage 项目集
+
+`yiage.vip` 首页展示全部项目。彩排抽号在 `/rehearsal/`，INMO 互动剧场在 `/inmo/`。首页卡片来自 `portal/projects.json`，各项目可以独立进入并返回首页。
+
+Netlify 执行 `npm run build:hub`，发布 `dist-hub/`。抽号继续使用原有函数和数据库。`npm test` 包含首页导航、分类搜索和抽号流程检查。
+
+以后新增静态项目，把文件放在 `projects/<项目英文名>/`，在 `portal/projects.json` 添加 `id`、`title`、`description`、`category`（`tool` 或 `game`）、`path`（`/<id>/`）、`image`、`action` 和 `source`（`projects/<id>/`）。封面放在 `portal/assets/`，其网页路径为 `/portal-assets/<文件名>`。新项目入口文件使用 `index.html`，项目内部资源使用相对路径。
+
+## INMO · 好戏开场
 
 Three.js 第一人称发布会互动喜剧。以用户提供的影目展会照片为舞台背景；人物和剧情为虚构群友演绎，非官方活动实录。
 
