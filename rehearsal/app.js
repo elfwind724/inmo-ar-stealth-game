@@ -15,6 +15,7 @@ const rosterForm = byId('admin-roster-form');
 const rosterInput = byId('roster-input');
 const startButton = byId('admin-start');
 const exportButton = byId('admin-export');
+const clearButton = byId('admin-clear');
 
 const phases = {
   closed: ['尚未开始', '开放时间请等负责人通知。', '抽号'],
@@ -253,6 +254,7 @@ function renderAdmin(payload) {
   startButton.hidden = !(closed || registering || canResume);
   startButton.textContent = canResume ? '重新开放剩余号码' : '开放抽号（1–13 号）';
   exportButton.hidden = event.results.length === 0;
+  clearButton.hidden = teams.length === 0;
   const roster = byId('roster');
   byId('roster-summary').textContent = `登记 ${event.teamCount} 组 · 已抽 ${event.drawnCount} / ${event.numberLimit}`;
   const sorted = [...teams].sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity));
@@ -373,6 +375,13 @@ exportButton.addEventListener('click', () => {
 });
 
 byId('admin-refresh').addEventListener('click', () => void adminAction({ action: 'adminState' }, '已更新。'));
+clearButton.addEventListener('click', () => {
+  if (adminSubmitting || !adminState?.teams.length) return;
+  const expectedTeams = adminState.teams.map(({ name, number }) => ({ name, number }));
+  if (window.confirm(`确定清空全部 ${expectedTeams.length} 条小组记录？\n已抽号码会全部退回，1–13 号恢复可抽。`)) {
+    void adminAction({ action: 'clear', expectedTeams }, '全部记录已清空，1–13 号已恢复。');
+  }
+});
 byId('admin-logout').addEventListener('click', () => {
   logout();
   keyInput.focus();

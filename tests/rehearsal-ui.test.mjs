@@ -149,6 +149,36 @@ test('a participant draws with just a name and an organizer can return a number 
   await until(() => participant.visible('draw-stage') && !participant.node('team-submit').disabled, 'The corrected name can draw');
   assert.ok(participant.text('draw-team').includes('更正小组'));
   assert.ok(participant.text('results').includes('更正小组'));
+
+  organizer.click('admin-refresh');
+  await until(() => organizer.text('roster').includes('更正小组') && !organizer.node('admin-refresh').disabled,
+    'Organizer can review every group before clearing');
+  assert.ok(organizer.visible('admin-clear'));
+  organizer.window.confirm = () => false;
+  const beforeCancel = organizer.requests.length;
+  organizer.click('admin-clear');
+  assert.equal(organizer.requests.length, beforeCancel, 'Canceling bulk clear keeps every record');
+  const clearSnapshot = fixture.event.teams.map(({ name, number, revealed }) => ({ name, number: revealed ? number : null }));
+  organizer.window.confirm = () => true;
+  organizer.click('admin-clear');
+  await until(() => fixture.event.teams.length === 0 && !organizer.node('admin-refresh').disabled,
+    'Organizer can clear all records in one action');
+  const clearRequest = organizer.requests.findLast(({ body }) => body?.action === 'clear');
+  assert.ok(clearRequest, 'The organizer uses the protected clear action');
+  assert.deepEqual([...clearRequest.body.expectedTeams].sort((a, b) => a.name.localeCompare(b.name)),
+    clearSnapshot.sort((a, b) => a.name.localeCompare(b.name)));
+  assert.equal(fixture.event.phase, 'drawing');
+  assert.equal(organizer.node('roster').children.length, 0);
+  assert.equal(organizer.visible('admin-clear'), false);
+
+  participant.click('refresh');
+  await until(() => participant.node('results').children.length === 0 && !participant.visible('draw-stage'),
+    'A public refresh clears the withdrawn personal award after bulk clear');
+  participant.input('team-name', '重新开始小组');
+  participant.click('team-submit');
+  await until(() => participant.visible('draw-stage') && !participant.node('team-submit').disabled,
+    'The full number pool can be drawn again after bulk clear');
+  assert.match(participant.text('draw-number'), /^(?:[1-9]|1[0-3])$/);
   for (const { headers } of [...registrant.requests, ...participant.requests]) {
     assert.equal(headers.has('Authorization'), false);
     assert.equal(headers.has('X-Rehearsal-Code'), false);

@@ -3,7 +3,7 @@ import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 const numberLimit = 13;
 const drawNumbers = Array.from({ length: numberLimit }, (_, index) => index + 1);
 const maxBodyBytes = 64 * 1024;
-const adminActions = new Set(['adminState', 'open', 'add', 'remove', 'start', 'finish']);
+const adminActions = new Set(['adminState', 'open', 'add', 'remove', 'clear', 'start', 'finish']);
 const nameOrder = new Intl.Collator('zh-CN');
 const responseHeaders = {
   'Cache-Control': 'no-store',
@@ -124,6 +124,31 @@ function removeTeam(state, body) {
   if (state.phase === 'finished' && remainingNumbers(state.teams) > 0) state.phase = 'drawing';
 }
 
+function clearTeams(state, expectedTeams) {
+  if (state.teams.length === 0) return;
+  if (!Array.isArray(expectedTeams) || expectedTeams.length === 0 || expectedTeams.length > numberLimit) {
+    reject(400, 'invalid_roster', '请先刷新完整名单，再清空。');
+  }
+
+  const expected = new Map();
+  for (const team of expectedTeams) {
+    if (!team || typeof team !== 'object' || Array.isArray(team)
+        || (team.number !== null && !Number.isInteger(team.number))) {
+      reject(400, 'invalid_roster', '请先刷新完整名单，再清空。');
+    }
+    const { key } = teamName(team.name);
+    if (expected.has(key)) reject(400, 'invalid_roster', '请先刷新完整名单，再清空。');
+    expected.set(key, team.number);
+  }
+
+  if (expected.size !== state.teams.length
+      || state.teams.some((team) => !expected.has(team.key) || expected.get(team.key) !== teamResult(team).number)) {
+    reject(409, 'stale_roster', '名单刚刚有变化，请刷新后再清空。');
+  }
+  state.teams = [];
+  if (state.phase === 'drawing' || state.phase === 'finished') state.phase = 'drawing';
+}
+
 function applyAdmin(state, body) {
   switch (body.action) {
     case 'open':
@@ -138,6 +163,9 @@ function applyAdmin(state, body) {
       break;
     case 'remove':
       removeTeam(state, body);
+      break;
+    case 'clear':
+      clearTeams(state, body.expectedTeams);
       break;
     case 'start':
       if (remainingNumbers(state.teams) > 0) state.phase = 'drawing';

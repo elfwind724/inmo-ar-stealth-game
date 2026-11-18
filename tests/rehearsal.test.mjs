@@ -29,7 +29,7 @@ test('the rehearsal API rejects missing or wrong organizer credentials without u
     store: new Proxy({}, { get: () => assert.fail('unauthorized request touched the database') }),
     getAdminKey: () => adminKey,
   });
-  for (const action of ['adminState', 'open', 'add', 'start', 'remove', 'finish']) {
+  for (const action of ['adminState', 'open', 'add', 'start', 'remove', 'clear', 'finish']) {
     await call(handler, action, { name: '测试小组', names: ['测试小组'] }, { expectedStatus: 401 });
     await call(handler, action, {}, { bearer: 'wrong-key', expectedStatus: 401 });
   }
@@ -160,4 +160,42 @@ test('a roster-free draw can open before registration, and prior assignments rem
   assert.deepEqual((await publicCall('draw', '已经抽号小组')).team, { name: '已经抽号小组', number: 1 });
   const { rows } = await pool.query('SELECT access_digest FROM christmas_rehearsal_event WHERE singleton');
   assert.equal(rows[0].access_digest, legacyDigest);
+});
+
+test('bulk clear requires a current roster and returns all numbers together', requiresPostgres, async (t) => {
+  const { pool, publicCall, admin } = await setupPostgres(t);
+  await admin('open', { names: ['待抽小组'] });
+  const registration = await admin('adminState');
+  assert.equal((await admin('clear', { expectedTeams: registration.teams })).state.phase, 'registering');
+  assert.equal((await publicCall()).teamCount, 0);
+  await admin('start');
+
+  const names = Array.from({ length: 13 }, (_, index) => `清空测试组 ${index + 1}`);
+  const firstDraws = await Promise.all(names.slice(0, 12).map((name) => publicCall('draw', name)));
+  assert.ok(firstDraws.every(({ team }) => Number.isInteger(team.number)));
+  const oldRoster = await admin('adminState');
+  const last = await publicCall('draw', names[12]);
+  assert.equal(last.state.phase, 'finished');
+  const beforeClear = await publicCall();
+
+  assert.equal((await admin('clear', { expectedTeams: oldRoster.teams }, 409)).error, 'stale_roster');
+  assert.deepEqual(await publicCall(), beforeClear, 'A stale clear cannot remove a just-completed draw');
+  assert.equal((await admin('clear', {}, 400)).error, 'invalid_roster');
+  assert.equal((await admin('clear', { expectedTeams: [{ name: names[0], number: '1' }] }, 400)).error, 'invalid_roster');
+  assert.deepEqual(await publicCall(), beforeClear);
+
+  const snapshot = await admin('adminState');
+  const cleared = await admin('clear', { expectedTeams: snapshot.teams });
+  assert.deepEqual(cleared.state, {
+    phase: 'drawing', teamCount: 0, drawnCount: 0, numberLimit: 13, remainingCount: 13, results: [],
+  });
+  assert.deepEqual(cleared.teams, []);
+  assert.deepEqual((await admin('clear', { expectedTeams: snapshot.teams })).state, cleared.state,
+    'Retrying an already-completed clear is safe');
+  assert.equal((await pool.query('SELECT count(*)::integer AS total FROM christmas_rehearsal_teams')).rows[0].total, 0);
+
+  const redraw = await Promise.all(names.map((name) => publicCall('draw', name)));
+  assert.equal(new Set(redraw.map(({ team }) => team.number)).size, 13);
+  const again = await publicCall();
+  assert.deepEqual(again.results.map(({ number }) => number), Array.from({ length: 13 }, (_, index) => index + 1));
 });
