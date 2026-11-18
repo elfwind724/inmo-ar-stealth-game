@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderProjects } from '../portal/render-projects.mjs';
+import { compileBrowserApp } from './build-browser-app.mjs';
 
 const root = await fs.realpath(fileURLToPath(new URL('../', import.meta.url)));
 const publish = path.resolve(root, 'dist-hub');
@@ -35,9 +36,15 @@ await fs.mkdir(path.join(publish, 'portal-assets'), { recursive: true });
 
 const portalTemplate = await fs.readFile(path.join(portal, 'index.html'), 'utf8');
 if (!portalTemplate.includes('<!-- PROJECT_CARDS -->')) throw new Error('Project card marker is missing');
-const portalHtml = portalTemplate.replace('<!-- PROJECT_CARDS -->', renderProjects(projects));
+const portalScript = await compileBrowserApp({
+  entry: path.join(portal, 'app.js'),
+  outdir: path.join(publish, 'portal-assets'),
+  publicPrefix: '/portal-assets',
+});
+const portalHtml = portalTemplate.replace('<!-- PROJECT_CARDS -->', renderProjects(projects))
+  .replace('src="/portal-assets/app.js"', `src="${portalScript}"`);
 await fs.writeFile(path.join(publish, 'index.html'), portalHtml);
-for (const file of ['style.css', 'app.js', 'projects.json']) {
+for (const file of ['style.css', 'projects.json']) {
   await fs.copyFile(path.join(portal, file), path.join(publish, 'portal-assets', file));
 }
 await fs.cp(path.join(portal, 'assets'), path.join(publish, 'portal-assets'), { recursive: true });
@@ -60,12 +67,23 @@ function includeNavigation(html) {
 async function buildRehearsal(destination) {
   const source = path.join(root, 'rehearsal');
   await fs.mkdir(destination, { recursive: true });
-  for (const file of ['app.js', 'style.css', 'draw-motion.js', 'draw-motion.css', 'chapel.webp']) {
+  for (const file of ['style.css', 'draw-motion.js', 'draw-motion.css', 'chapel.webp']) {
     await fs.copyFile(path.join(source, file), path.join(destination, file));
   }
   const sourceHtml = await fs.readFile(path.join(source, 'index.html'), 'utf8');
-  const html = includeNavigation(sourceHtml).replace('<footer class="site-footer">',
+  const script = await compileBrowserApp({ entry: path.join(source, 'app.js'), outdir: destination, publicPrefix: '/rehearsal' });
+  let html = includeNavigation(sourceHtml).replace('<footer class="site-footer">',
     '<footer class="site-footer"><a class="hub-home-link" href="/">← 项目首页</a>');
+  html = html.replace('src="/rehearsal/app.js"', `src="${script}"`);
+  if (html.includes('src="/rehearsal/boot.js"')) {
+    const boot = await compileBrowserApp({
+      entry: path.join(source, 'boot.js'),
+      outdir: destination,
+      publicPrefix: '/rehearsal',
+      target: ['es5'],
+    });
+    html = html.replace('src="/rehearsal/boot.js"', `src="${boot}"`);
+  }
   await fs.writeFile(path.join(destination, 'index.html'), html);
 }
 

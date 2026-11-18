@@ -6,6 +6,7 @@
   padding: 13px 15px 15px;
   border: 1px solid #335f50;
   border-radius: 16px;
+  background-color: #0b392b;
   background:
     radial-gradient(ellipse at 50% 115%, #40775c 0%, transparent 66%),
     radial-gradient(ellipse at 50% 16%, #29644d9c, transparent 72%),
@@ -18,6 +19,10 @@
   content: "";
   position: absolute;
   z-index: -1;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   background: repeating-radial-gradient(ellipse at 50% 55%, transparent 0 27px, #a9cfab36 28px, transparent 29px 54px);
   mask-image: linear-gradient(90deg, #000, transparent 36%, transparent 64%, #000);
@@ -35,10 +40,15 @@
 
 #draw-stage .draw-display {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   display: grid;
   place-items: center;
   overflow: hidden;
+  width: 130px;
   width: clamp(120px, 43%, 158px);
+  height: 84px;
   height: clamp(74px, 21vw, 100px);
   margin: 8px auto 0;
   border: 1px solid #aabc9d69;
@@ -50,6 +60,10 @@
 #draw-stage .draw-display::before {
   content: "";
   position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   border-radius: inherit;
   background: linear-gradient(180deg, #b3dfad19, transparent 35%, transparent 68%, #0d281e43);
@@ -57,6 +71,7 @@
 }
 
 #draw-number, #draw-stage .draw-prior-number {
+  font-size: 3.2rem;
   font-size: clamp(2.9rem, 13vw, 4.45rem);
   font-weight: 800;
   line-height: 1.12;
@@ -73,7 +88,14 @@
 
 #draw-stage .draw-prior-number {
   position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   display: grid;
   align-items: center;
   padding-right: .055em;
@@ -97,6 +119,7 @@
   font-size: 1.02rem;
   font-weight: 750;
   line-height: 1.45;
+  overflow-wrap: break-word;
   overflow-wrap: anywhere;
 }
 
@@ -127,6 +150,10 @@
 #draw-stage[data-state="result"] .draw-display::after {
   content: "";
   position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   background: linear-gradient(108deg, transparent 25%, #ffe8a02e 50%, transparent 66%);
   pointer-events: none;
@@ -135,6 +162,10 @@
 
 #draw-stage .draw-sparks {
   position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   inset: 0;
   pointer-events: none;
 }

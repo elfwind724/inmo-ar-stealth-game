@@ -21,9 +21,20 @@ function openPage(t, hash, handler, { reducedMotion = true } = {}) {
   const dom = new JSDOM(html, { url: new URL(hash, url), runScripts: 'outside-only', pretendToBeVisual: true });
   const { window } = dom;
   const requests = [];
-  window.fetch = (path, options = {}) => {
-    requests.push({ body: options.body ? JSON.parse(options.body) : null, headers: new Headers(options.headers) });
-    return handler(new Request(new URL(path, url), options));
+  window.XMLHttpRequest = class {
+    headers = {};
+    open(method, path) { this.method = method; this.path = path; }
+    setRequestHeader(name, value) { this.headers[name] = value; }
+    send(body) {
+      requests.push({ body: body ? JSON.parse(body) : null, headers: new Headers(this.headers) });
+      handler(new Request(new URL(this.path, url), {
+        method: this.method, headers: this.headers, body,
+      })).then(async (response) => {
+        this.status = response.status;
+        this.responseText = await response.text();
+        this.onload();
+      }, () => this.onerror());
+    }
   };
   window.confirm = () => true;
   window.matchMedia = (query) => ({ matches: reducedMotion && query === '(prefers-reduced-motion: reduce)' });

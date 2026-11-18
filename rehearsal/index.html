@@ -8,7 +8,8 @@
   <title>2026 圣诞彩排抽号</title>
   <link rel="stylesheet" href="/rehearsal/style.css">
   <link rel="stylesheet" href="/rehearsal/draw-motion.css">
-  <script type="module" src="/rehearsal/app.js"></script>
+  <script defer src="/rehearsal/boot.js"></script>
+  <script id="app-script" defer src="/rehearsal/app.js"></script>
 </head>
 <body>
   <div class="page">
@@ -22,6 +23,11 @@
     <main id="participants" class="layout">
       <section class="card action-card" aria-labelledby="action-title">
         <h2 id="action-title" class="visually-hidden">抽取彩排号码</h2>
+        <div id="load-help" class="notice" role="status">
+          <p id="load-message">正在准备抽号页面…</p>
+          <a href="/rehearsal/?reload=1">重新加载页面</a>
+        </div>
+        <noscript><p class="notice error">请在浏览器设置中开启 JavaScript，或用手机自带浏览器打开。</p></noscript>
         <div class="phase-line">
           <div id="phase-badge" class="phase"><span></span><strong id="phase-label">正在连接</strong></div>
           <p id="action-detail" class="muted" role="status">正在读取抽号状态。</p>

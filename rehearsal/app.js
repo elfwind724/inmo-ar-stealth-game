@@ -36,37 +36,42 @@ let adminSubmitting = false;
 let publicVersion = 0;
 let adminVersion = 0;
 let displayedDraw;
-async function request(data, { key = '' } = {}) {
-  const headers = { Accept: 'application/json' };
-  if (data) headers['Content-Type'] = 'application/json';
-  if (key) headers.Authorization = `Bearer ${key}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
+async function request(data, options = {}) {
+  const key = options.key || '';
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(data ? 'POST' : 'GET', endpoint);
+    xhr.timeout = 12000;
+    xhr.setRequestHeader('Accept', 'application/json');
+    if (data) xhr.setRequestHeader('Content-Type', 'application/json');
+    if (key) xhr.setRequestHeader('Authorization', `Bearer ${key}`);
+    xhr.onload = () => {
+      let result;
+      try {
+        result = JSON.parse(xhr.responseText);
+      } catch {
+        reject(new Error('页面数据暂时无法读取，请点击刷新重试。'));
+        return;
+      }
+      if (xhr.status < 200 || xhr.status >= 300 || !result) {
+        reject(Object.assign(new Error(result?.message || '暂时无法连接，请稍后再试。'), {
+          code: result?.error,
+          status: xhr.status,
+        }));
+        return;
+      }
+      resolve(result);
+    };
+    xhr.onerror = xhr.ontimeout = xhr.onabort = () => {
+      reject(new Error('网络连接较慢，请点击刷新重试。'));
+    };
+    xhr.send(data ? JSON.stringify(data) : null);
+  });
+}
 
-  try {
-    const response = await fetch(endpoint, {
-      method: data ? 'POST' : 'GET',
-      headers,
-      body: data ? JSON.stringify(data) : undefined,
-      cache: 'no-store',
-      signal: controller.signal,
-    });
-    const result = await response.json().catch(() => null);
-    if (!response.ok || !result) {
-      throw Object.assign(new Error(result?.message || '暂时无法连接，请稍后再试。'), {
-        code: result?.error,
-        status: response.status,
-      });
-    }
-    return result;
-  } catch (error) {
-    if (error instanceof TypeError || error.name === 'AbortError') {
-      throw new Error('连接超时或网络不稳定，请稍后重试。');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
+function replaceRows(container, rows = []) {
+  while (container.firstChild) container.removeChild(container.firstChild);
+  rows.forEach((row) => container.appendChild(row));
 }
 
 function feedback(id, message = '') {
@@ -98,12 +103,12 @@ function groupRow(team) {
     const number = document.createElement('span');
     number.className = 'number';
     number.textContent = `${team.number} 号`;
-    row.append(number);
+    row.appendChild(number);
   }
   const name = document.createElement('span');
   name.className = 'group';
   name.textContent = team.name;
-  row.append(name);
+  row.appendChild(name);
   return row;
 }
 
@@ -119,18 +124,18 @@ function renderPublic(nextState) {
   }
   if (state?.phase !== nextState.phase) clearTeamFeedback();
   state = nextState;
-  const [label, detail, button] = phases[state.phase];
-  phaseLabel(state.phase, label, state.phase === 'drawing'
+  const phase = phases[state.phase];
+  phaseLabel(state.phase, phase[0], state.phase === 'drawing'
     ? `填好小组名称，抽取 1–${state.numberLimit} 号。`
-    : detail);
-  teamSubmit.textContent = button;
+    : phase[1]);
+  teamSubmit.textContent = phase[2];
   const orderSummary = byId('order-summary');
   orderSummary.hidden = state.phase === 'closed';
   orderSummary.textContent = state.phase === 'registering'
     ? `已登记 ${state.teamCount} 组`
     : `已抽 ${state.drawnCount} / ${state.numberLimit} · 剩 ${state.remainingCount} 个号码`;
   const results = [...state.results].sort((a, b) => a.number - b.number);
-  byId('results').replaceChildren(...results.map(groupRow));
+  replaceRows(byId('results'), results.map(groupRow));
   byId('results').hidden = results.length === 0;
   byId('empty-results').hidden = results.length > 0;
   byId('empty-results').textContent = state.phase === 'drawing' ? '还没有小组抽号。' : '抽号结果会显示在这里。';
@@ -141,7 +146,8 @@ function renderPublic(nextState) {
   feedback('refresh-notice');
 }
 
-async function refreshPublic({ manual = false } = {}) {
+async function refreshPublic(options = {}) {
+  const manual = options.manual === true;
   if (refreshing || teamSubmitting || organizer) return;
   const version = ++publicVersion;
   refreshing = true;
@@ -244,7 +250,8 @@ refreshButton.addEventListener('click', () => void refreshPublic({ manual: true 
 
 function renderAdmin(payload) {
   adminState = payload;
-  const { state: event, teams } = payload;
+  const event = payload.state;
+  const teams = payload.teams;
   const registering = event.phase === 'registering';
   const closed = event.phase === 'closed';
   const canResume = event.phase === 'finished' && event.remainingCount > 0;
@@ -265,7 +272,7 @@ function renderAdmin(payload) {
   const roster = byId('roster');
   byId('roster-summary').textContent = `登记 ${event.teamCount} 组 · 已抽 ${event.drawnCount} / ${event.numberLimit}`;
   const sorted = [...teams].sort((a, b) => (a.number ?? Infinity) - (b.number ?? Infinity));
-  roster.replaceChildren(...sorted.map((team) => {
+  replaceRows(roster, sorted.map((team) => {
     const row = groupRow(team);
     const remove = document.createElement('button');
     remove.type = 'button';
@@ -280,7 +287,7 @@ function renderAdmin(payload) {
         void adminAction({ action: 'remove', name: team.name, expectedNumber: team.number }, success);
       }
     });
-    row.append(remove);
+    row.appendChild(remove);
     return row;
   }));
   roster.hidden = teams.length === 0;
@@ -297,7 +304,7 @@ function logout() {
   authForm.hidden = false;
   adminControls.hidden = true;
   byId('admin-list').hidden = true;
-  byId('roster').replaceChildren();
+  replaceRows(byId('roster'));
   byId('organizer-hint').textContent = '输入负责人口令后管理报名和抽号。';
   feedback('admin-error');
   feedback('admin-message');
@@ -307,7 +314,7 @@ async function adminAction(data, success = '', candidate = adminKey) {
   if (adminSubmitting || !candidate) return false;
   const version = ++adminVersion;
   adminSubmitting = true;
-  const controls = [...byId('organizer').querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)')];
+  const controls = Array.prototype.slice.call(byId('organizer').querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)'));
   for (const control of controls) control.disabled = true;
   feedback('admin-error');
   feedback('admin-message');
@@ -367,12 +374,12 @@ startButton.addEventListener('click', () => {
 function csvCell(value) {
   const text = String(value);
   const safeText = /^\s*[=+@\-]/.test(text) ? `'${text}` : text;
-  return `"${safeText.replaceAll('"', '""')}"`;
+  return `"${safeText.replace(/"/g, '""')}"`;
 }
 
 exportButton.addEventListener('click', () => {
   const rows = [...adminState.state.results].sort((a, b) => a.number - b.number);
-  const contents = rows.map(({ name, number }) => `${number},${csvCell(name)}`);
+  const contents = rows.map((team) => `${team.number},${csvCell(team.name)}`);
   const file = new Blob(['\ufeff彩排顺序,小组名称\r\n', contents.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(file);
   const anchor = document.createElement('a');
@@ -401,7 +408,7 @@ limitForm.addEventListener('submit', async (event) => {
 });
 clearButton.addEventListener('click', () => {
   if (adminSubmitting || !adminState?.teams.length) return;
-  const expectedTeams = adminState.teams.map(({ name, number }) => ({ name, number }));
+  const expectedTeams = adminState.teams.map((team) => ({ name: team.name, number: team.number }));
   const numberLimit = adminState.state.numberLimit;
   if (window.confirm(`确定清空全部 ${expectedTeams.length} 条小组记录？\n已抽号码会全部退回，1–${numberLimit} 号恢复可抽。`)) {
     void adminAction({ action: 'clear', expectedTeams }, `全部记录已清空，1–${numberLimit} 号已恢复。`);
@@ -437,3 +444,6 @@ setInterval(() => {
 }, 15000);
 
 route();
+const loadHelp = byId('load-help');
+if (loadHelp) loadHelp.hidden = true;
+window.RehearsalBoot?.ready();

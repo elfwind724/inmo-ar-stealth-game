@@ -1,7 +1,7 @@
 const search = document.getElementById('project-search');
 const clearSearch = document.getElementById('clear-search');
-const filters = [...document.querySelectorAll('[data-filter]')];
-const projects = [...document.querySelectorAll('[data-project-id]')];
+const filters = Array.prototype.slice.call(document.querySelectorAll('[data-filter]'));
+const projects = Array.prototype.slice.call(document.querySelectorAll('[data-project-id]'));
 let selectedCategory = 'all';
 
 function showProjects() {

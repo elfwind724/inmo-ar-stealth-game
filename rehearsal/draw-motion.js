@@ -17,13 +17,13 @@ export function createDrawMotion(stage) {
   team.setAttribute('aria-hidden', 'true');
   priorNumber.className = 'draw-prior-number';
   sparks.className = 'draw-sparks';
-  for (let index = 0; index < 8; index += 1) sparks.append(document.createElement('i'));
+  for (let index = 0; index < 8; index += 1) sparks.appendChild(document.createElement('i'));
   announcement.className = 'visually-hidden';
   announcement.setAttribute('role', 'status');
-  display.append(priorNumber);
+  display.appendChild(priorNumber);
   sparks.setAttribute('aria-hidden', 'true');
-  stage.append(sparks);
-  stage.after(announcement);
+  stage.appendChild(sparks);
+  stage.parentNode.insertBefore(announcement, stage.nextSibling);
 
   let position = 0;
   let reel = [];
