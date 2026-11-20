@@ -16,5 +16,15 @@
     "path": "/inmo/",
     "image": "/portal-assets/inmo.webp",
     "action": "入座看戏"
+  },
+  {
+    "id": "downloads",
+    "title": "INMO Future 应用下载",
+    "description": "找眼镜能用的安卓应用，查看真机体验与安装包来源。",
+    "category": "tool",
+    "path": "/downloads/",
+    "image": "/portal-assets/inmo-downloads.svg",
+    "action": "浏览应用",
+    "source": "projects/downloads"
   }
 ]

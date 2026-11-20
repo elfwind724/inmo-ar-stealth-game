@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="为 INMO Future 整理的安卓应用下载、版本和真机记录。">
+<title>INMO Future 应用下载 · Yiage</title>
+<link rel="stylesheet" href="./style.css">
+<script src="./filter.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+<header class="bar"><a href="/" class="home">← Yiage 项目首页</a><span>INMO FUTURE</span></header>
+<main>
+<section class="hero" aria-labelledby="page-title">
+<div><p class="eyebrow">给眼镜装点新东西</p><h1 id="page-title">应用下载</h1><p class="intro">先看看哪些应用在眼镜上用过，再挑你想装的。APK 和商店入口都指向公开来源。</p><a class="button main" href="#library">浏览应用 ↓</a></div>
+<img src="/portal-assets/inmo-downloads.svg" width="800" height="500" alt="">
+</section>
+<!-- FEATURE -->
+<section id="library" aria-labelledby="library-title">
+<div class="section-head"><div><p class="eyebrow">APP LIBRARY</p><h2 id="library-title">应用目录</h2></div><p id="results" role="status"><!-- COUNT --></p></div>
+<div id="filters" hidden><label for="search">搜索应用</label><input id="search" type="search" placeholder="输入应用名、包名或分类" autocomplete="off"><div class="pills" role="group" aria-label="筛选应用"><button type="button" data-view="all" aria-pressed="true">全部</button><button type="button" data-view="ready" aria-pressed="false">有下载入口</button><button type="button" data-view="checked" aria-pressed="false">有真机体验</button></div></div>
+<div class="grid"><!-- CARDS --></div>
+<p id="empty" class="empty" hidden>没有符合条件的应用，试试别的关键词。</p>
+</section>
+<section class="guide" aria-labelledby="guide-title"><h2 id="guide-title">怎么装到眼镜上？</h2><ol><li>在手机或电脑上下载 APK；商店页面需按其提示下载。</li><li>将 APK 传到眼镜内，用文件管理器打开。若系统提示，按需允许该文件管理器安装未知应用，装完可关闭权限。</li><li>也可用电脑通过 USB 连接并授权调试，运行 <code>adb install 文件名.apk</code>。</li></ol><p>页面里的版本是记录版本，商店和非固定链接可能更新。标为「真机体验」的是报告中做过的操作；标为「已安装」的应用还没有逐项测试。</p></section>
+</main>
+<footer><a href="/">Yiage 项目首页</a><span>社区整理 · 非 INMO 官方下载站</span></footer>
+</div>
+</body>
+</html>

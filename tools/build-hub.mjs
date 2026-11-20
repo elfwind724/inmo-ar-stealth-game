@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderProjects } from '../portal/render-projects.mjs';
 import { compileBrowserApp } from './build-browser-app.mjs';
+import { renderDownloadDirectory } from './render-downloads.mjs';
 
 const root = await fs.realpath(fileURLToPath(new URL('../', import.meta.url)));
 const publish = path.resolve(root, 'dist-hub');
@@ -23,7 +24,7 @@ for (const project of projects) {
   if (project.path !== `/${project.id}/` || routes.has(project.path)) {
     throw new Error(`Unexpected project path for ${project.id}`);
   }
-  if (!/^\/portal-assets\/[a-z0-9-]+\.(webp|png|jpg)$/.test(project.image)) {
+  if (!/^\/portal-assets\/[a-z0-9-]+\.(webp|png|jpg|svg)$/.test(project.image)) {
     throw new Error(`Unexpected project cover for ${project.id}`);
   }
   await fs.access(path.join(portal, 'assets', path.posix.basename(project.image)));
@@ -137,6 +138,7 @@ async function buildStaticProject(project, destination) {
       return true;
     },
   });
+  if (project.id === 'downloads') await renderDownloadDirectory(source, destination);
 }
 
 for (const project of projects) {
